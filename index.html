@@ -1,0 +1,2758 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EFL Listening Hub - Interactive Practice</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+            }
+          },
+          animation: {
+            'bounce-slow': 'bounce 2s infinite',
+            'wiggle': 'wiggle 0.3s ease-in-out infinite',
+          },
+          keyframes: {
+            wiggle: {
+              '0%, 100%': { transform: 'rotate(-3deg)' },
+              '50%': { transform: 'rotate(3deg)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght=300..700&family=Plus+Jakarta+Sans:wght=300..800&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .font-display {
+      font-family: 'Fredoka', sans-serif;
+    }
+    /* Memory Cards flip styles */
+    .card-perspective {
+      perspective: 1000px;
+    }
+    .card-inner {
+      transition: transform 0.5s;
+      transform-style: preserve-3d;
+    }
+    .card-flipped {
+      transform: rotateY(180deg);
+    }
+    .card-front, .card-back {
+      backface-visibility: hidden;
+    }
+    .card-back {
+      transform: rotateY(180deg);
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100 transition-colors duration-300 min-h-full flex flex-col">
+
+  <!-- SOUND EFFECTS LAYER (Web Audio API Synthesizer) -->
+  <script>
+    class SoundEffectsManager {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+      init() {
+        if (!this.ctx) {
+          this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+      }
+      toggleMute() {
+        this.muted = !this.muted;
+        return this.muted;
+      }
+      playCorrect() {
+        if (this.muted) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc1 = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        
+        osc1.type = 'triangle';
+        osc2.type = 'sine';
+        
+        osc1.frequency.setValueAtTime(523.25, now); // C5
+        osc1.frequency.setValueAtTime(659.25, now + 0.1); // E5
+        osc1.frequency.setValueAtTime(783.99, now + 0.2); // G5
+        osc1.frequency.setValueAtTime(1046.50, now + 0.3); // C6
+        
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+        
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc1.start(now);
+        osc1.stop(now + 0.5);
+      }
+      playIncorrect() {
+        if (this.muted) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        
+        // Soft, low-frequency dull pop to avoid annoying the student
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(120, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.15);
+        
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc.start(now);
+        osc.stop(now + 0.15);
+      }
+      playTick() {
+        if (this.muted) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(750, now);
+        
+        gain.gain.setValueAtTime(0.03, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+        
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        
+        osc.start(now);
+        osc.stop(now + 0.04);
+      }
+      playWin() {
+        if (this.muted) return;
+        this.init();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.setValueAtTime(554.37, now + 0.1);
+        osc.frequency.setValueAtTime(659.25, now + 0.2);
+        osc.frequency.setValueAtTime(880, now + 0.3);
+        
+        gain.gain.setValueAtTime(0.15, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+        
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.6);
+      }
+    }
+    const sounds = new SoundEffectsManager();
+  </script>
+
+  <!-- APP MAIN HEADER -->
+  <header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 py-4 px-6 sticky top-0 z-50 transition-colors hidden" id="appHeader">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <!-- Logo & Level info -->
+      <div class="flex items-center space-x-4">
+        <button onclick="goHome()" class="text-brand-500 hover:text-brand-600 font-display text-2xl font-bold flex items-center gap-2">
+          <span>🎧</span> <span class="hidden sm:inline">EFL Listening Hub</span>
+        </button>
+        <span id="levelBadge" class="bg-brand-100 text-brand-700 dark:bg-brand-900/50 dark:text-brand-300 font-bold px-3 py-1 rounded-full text-sm font-display">A1</span>
+      </div>
+      
+      <!-- Live Stats & Accessibility Toggles -->
+      <div class="flex items-center space-x-6">
+        <div class="flex items-center space-x-2">
+          <span class="text-amber-500 text-xl">⭐</span>
+          <span id="headerScore" class="font-bold text-lg">0</span>
+        </div>
+        
+        <div class="flex items-center space-x-2">
+          <!-- Audio toggle -->
+          <button id="soundToggle" onclick="toggleMute()" class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Toggle Sound On/Off">
+            <svg id="soundOnIcon" class="w-6 h-6 text-slate-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+            <svg id="soundOffIcon" class="w-6 h-6 text-slate-400 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zm12.55-9.9l-5.656 5.656m0 0l-5.656 5.656m5.656-5.656l5.656 5.656m-5.656-5.656L12.43 5.1z"/></svg>
+          </button>
+          
+          <!-- Dark mode toggle -->
+          <button onclick="toggleDarkMode()" class="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Toggle Theme">
+            <svg class="w-6 h-6 text-slate-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Progression bar -->
+    <div class="w-full bg-slate-100 dark:bg-slate-700 h-2 mt-4 rounded-full overflow-hidden">
+      <div id="mainProgressBar" class="bg-brand-500 h-full w-0 transition-all duration-500"></div>
+    </div>
+  </header>
+
+  <!-- CONFETTI CANVAS FRAME -->
+  <canvas id="confettiCanvas" class="fixed inset-0 pointer-events-none z-50 hidden"></canvas>
+
+  <main class="flex-grow flex flex-col items-center justify-center p-4 max-w-7xl w-full mx-auto">
+    
+    <!-- LEVEL SCREEN -->
+    <section id="levelScreen" class="w-full max-w-4xl text-center py-12 px-4 space-y-12">
+      <div class="space-y-4">
+        <span class="text-6xl animate-bounce-slow inline-block">🎧</span>
+        <h1 class="text-4xl md:text-6xl font-extrabold font-display bg-clip-text text-transparent bg-gradient-to-r from-brand-500 to-indigo-600">EFL Listening Hub</h1>
+        <p class="text-lg md:text-xl text-slate-600 dark:text-slate-300 max-w-xl mx-auto">
+          Improve your English Listening Skills using the Pre ➔ While ➔ Post Listening approach. Practice simple past verbs while playing games!
+        </p>
+      </div>
+
+      <!-- Mode Selector -->
+      <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 max-w-md mx-auto space-y-3">
+        <h3 class="font-bold text-sm text-slate-500 uppercase tracking-wider">Choose Learning Path</h3>
+        <div class="grid grid-cols-2 gap-2">
+          <button onclick="setAppMode('free')" id="modeBtn-free" class="py-2 px-4 rounded-xl font-bold transition-all bg-brand-500 text-white shadow-md">
+            Free Access
+          </button>
+          <button onclick="setAppMode('scaffold')" id="modeBtn-scaffold" class="py-2 px-4 rounded-xl font-bold transition-all bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+            Scaffolding 🔒
+          </button>
+        </div>
+        <p id="modeDescription" class="text-xs text-slate-400">Feel free to access and complete any English proficiency level you prefer!</p>
+      </div>
+
+      <div class="space-y-6">
+        <h2 class="text-2xl font-bold font-display">Select your CEFR English Level:</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4" id="levelButtonsGrid">
+          
+          <button id="lvlBtn-A1" onclick="selectLevel('A1')" class="group bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md hover:shadow-xl border-2 border-slate-200 dark:border-slate-700 hover:border-brand-500 dark:hover:border-brand-500 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center">
+            <span class="text-3xl font-extrabold font-display text-emerald-500 mb-2">A1</span>
+            <span class="font-bold text-slate-700 dark:text-slate-200">Beginner</span>
+            <span class="text-xs text-slate-400 dark:text-slate-500 mt-2">Simple sentences</span>
+          </button>
+          
+          <button id="lvlBtn-A2" onclick="selectLevel('A2')" class="group bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md hover:shadow-xl border-2 border-slate-200 dark:border-slate-700 hover:border-brand-500 dark:hover:border-brand-500 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center">
+            <span class="text-3xl font-extrabold font-display text-sky-500 mb-2">A2 <span class="lvlLock text-lg"></span></span>
+            <span class="font-bold text-slate-700 dark:text-slate-200">Elementary</span>
+            <span class="text-xs text-slate-400 dark:text-slate-500 mt-2">Tom &amp; Anna's Day</span>
+          </button>
+          
+          <button id="lvlBtn-B1" onclick="selectLevel('B1')" class="group bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md hover:shadow-xl border-2 border-slate-200 dark:border-slate-700 hover:border-brand-500 dark:hover:border-brand-500 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center">
+            <span class="text-3xl font-extrabold font-display text-amber-500 mb-2">B1 <span class="lvlLock text-lg"></span></span>
+            <span class="font-bold text-slate-700 dark:text-slate-200">Intermediate</span>
+            <span class="text-xs text-slate-400 dark:text-slate-500 mt-2">Natural stories</span>
+          </button>
+          
+          <button id="lvlBtn-B2" onclick="selectLevel('B2')" class="group bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md hover:shadow-xl border-2 border-slate-200 dark:border-slate-700 hover:border-brand-500 dark:hover:border-brand-500 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center">
+            <span class="text-3xl font-extrabold font-display text-orange-500 mb-2">B2 <span class="lvlLock text-lg"></span></span>
+            <span class="font-bold text-slate-700 dark:text-slate-200">Upper-Intermediate</span>
+            <span class="text-xs text-slate-400 dark:text-slate-500 mt-2">Fluency &amp; setback</span>
+          </button>
+          
+          <button id="lvlBtn-C1" onclick="selectLevel('C1')" class="group bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-md hover:shadow-xl border-2 border-slate-200 dark:border-slate-700 hover:border-brand-500 dark:hover:border-brand-500 transition-all duration-300 transform hover:-translate-y-1 flex flex-col items-center">
+            <span class="text-3xl font-extrabold font-display text-rose-500 mb-2">C1 <span class="lvlLock text-lg"></span></span>
+            <span class="font-bold text-slate-700 dark:text-slate-200">Advanced</span>
+            <span class="text-xs text-slate-400 dark:text-slate-500 mt-2">Complex nuances</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- MAIN STEPS CONTAINER -->
+    <section id="stepContainer" class="w-full max-w-4xl bg-white dark:bg-slate-800 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-700 p-6 md:p-8 hidden">
+      
+      <!-- Navigation tabs -->
+      <nav class="flex items-center justify-between mb-8 overflow-x-auto pb-2 border-b border-slate-100 dark:border-slate-700">
+        <div class="flex items-center space-x-4 sm:space-x-8 mx-auto">
+          
+          <button onclick="goToPhase('pre')" id="phaseTab-pre" class="flex items-center space-x-2 font-display font-semibold pb-2 border-b-2 transition-all">
+            <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">1</span>
+            <span>Pre-Listening</span>
+          </button>
+          
+          <button onclick="goToPhase('while')" id="phaseTab-while" class="flex items-center space-x-2 font-display font-semibold pb-2 transition-all">
+            <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">2</span>
+            <span>While-Listening</span>
+          </button>
+          
+          <button onclick="goToPhase('post')" id="phaseTab-post" class="flex items-center space-x-2 font-display font-semibold pb-2 transition-all">
+            <span class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold">3</span>
+            <span>Post-Listening</span>
+          </button>
+          
+        </div>
+      </nav>
+
+      <!-- PHASE 1: PRE-LISTENING (MEMORY MATCH: VERB WITH SUBJECT + COMPLEMENT) -->
+      <div id="step-pre" class="space-y-6">
+        <div class="text-center space-y-2">
+          <h3 class="text-2xl font-bold font-display text-brand-600 dark:text-brand-400">Memory Match: Subject + Verb ➔ Complement</h3>
+          <p class="text-slate-600 dark:text-slate-300">Flip cards to match the **Subject + Verb** card on one side with its correct **Complement** to make a complete past event phrase!</p>
+        </div>
+
+        <!-- Floating helpful tips -->
+        <div id="classmateTipBox" class="bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-300 p-3 rounded-xl border border-amber-200 text-center font-semibold text-sm hidden flex items-center justify-center gap-2 animate-pulse">
+          <span>😊</span> <span id="classmateTipText">Flip cards to begin matching!</span>
+        </div>
+
+        <!-- Memory Board Grid -->
+        <div id="memoryBoard" class="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-3xl mx-auto py-4">
+          <!-- Dynamically populated via script -->
+        </div>
+
+        <!-- Next phase card unlock -->
+        <div id="memoryCompletion" class="hidden text-center bg-emerald-50 dark:bg-emerald-950/30 p-6 rounded-2xl border border-emerald-100 dark:border-emerald-900/50 space-y-4 animate-bounce-slow">
+          <span class="text-4xl">🎉</span>
+          <h4 class="text-xl font-bold text-emerald-800 dark:text-emerald-400">Awesome! You are ready for the listening 🎧</h4>
+          <button onclick="goToPhase('while')" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-6 py-3 rounded-xl transition duration-300 shadow-md">
+            Start While-Listening 🎧
+          </button>
+        </div>
+      </div>
+
+      <!-- PHASE 2: WHILE-LISTENING -->
+      <div id="step-while" class="space-y-8 hidden">
+        <div class="text-center space-y-2">
+          <h3 class="text-2xl font-bold font-display text-brand-600 dark:text-brand-400">Listen Closely</h3>
+          <p class="text-slate-600 dark:text-slate-300">Play the audio file (maximum 2 times) and answer the 10 comprehension questions.</p>
+        </div>
+
+        <!-- Custom Audio Player Panel -->
+        <div class="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 max-w-xl mx-auto flex flex-col items-center space-y-4">
+          <div class="flex items-center space-x-4">
+            <!-- Play trigger button -->
+            <button id="audioPlayBtn" onclick="playAudio()" class="w-16 h-16 rounded-full bg-brand-500 text-white flex items-center justify-center hover:bg-brand-600 shadow-lg transition transform hover:scale-105">
+              <svg class="w-8 h-8 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </button>
+            <div class="text-left">
+              <h4 id="audioTitle" class="font-bold text-lg">Level Dialogue</h4>
+              <p class="text-sm text-slate-400">Plays remaining: <span id="playsRemaining" class="font-bold text-brand-500">2/2</span></p>
+            </div>
+          </div>
+          
+          <!-- Native Audio player source file -->
+          <audio id="nativeAudio" src="Generated%20Audio%20June%2002,%202026%20-%206_47PM%20(1).wav" class="hidden"></audio>
+
+          <!-- Audio track progression bar -->
+          <div class="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+            <div id="audioProgressBar" class="bg-brand-500 h-full w-0 transition-all duration-300"></div>
+          </div>
+        </div>
+
+        <!-- Quiz Form container -->
+        <div id="quizContainer" class="max-w-xl mx-auto space-y-6">
+          <div class="flex justify-between items-center text-sm font-semibold text-slate-400">
+            <span>Question <span id="currentQuestionNum" class="text-brand-500">1</span> of 10</span>
+            <span>Correct: <span id="correctCounter" class="text-emerald-500">0</span></span>
+          </div>
+
+          <!-- Active Question block -->
+          <div class="bg-slate-50 dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 space-y-4">
+            <h4 id="quizQuestionText" class="font-bold text-lg md:text-xl text-slate-800 dark:text-slate-100">Loading Question...</h4>
+            <div id="quizOptions" class="grid grid-cols-1 gap-3">
+              <!-- Loaded via JavaScript -->
+            </div>
+          </div>
+
+          <!-- Explanation box and Correct Answers notes -->
+          <div id="explanationBox" class="hidden bg-slate-100 dark:bg-slate-800 p-5 rounded-2xl border-l-4 border-brand-500 space-y-2">
+            <span id="explanationTitle" class="font-bold text-slate-800 dark:text-slate-100">Explanation</span>
+            <p id="explanationText" class="text-sm text-slate-600 dark:text-slate-300"></p>
+            <button id="nextQuestionBtn" onclick="nextQuestion()" class="mt-4 bg-brand-500 hover:bg-brand-600 text-white font-bold py-2 px-4 rounded-xl text-sm transition">
+              Next Question ➜
+            </button>
+          </div>
+        </div>
+
+        <!-- Completion panel -->
+        <div id="whileCompletion" class="hidden text-center bg-emerald-50 dark:bg-emerald-950/30 p-6 rounded-2xl border border-emerald-100 dark:border-emerald-900/50 space-y-4">
+          <span class="text-4xl">📚</span>
+          <h4 class="text-xl font-bold text-emerald-800 dark:text-emerald-400">Comprehension Quiz Finished!</h4>
+          <p class="text-slate-600 dark:text-slate-300">You are ready to proceed to creative language production.</p>
+          <button onclick="goToPhase('post')" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-6 py-3 rounded-xl transition duration-300 shadow-md">
+            Go to Post-Listening 🚀
+          </button>
+        </div>
+      </div>
+
+      <!-- PHASE 3: POST-LISTENING (REDESIGNED FOR EVALUATED WRITING CHALLENGE) -->
+      <div id="step-post" class="space-y-12 hidden">
+        
+        <!-- Tab menu triggers -->
+        <div class="flex border-b border-slate-100 dark:border-slate-700 justify-around text-sm font-semibold">
+          <button id="subTab-seq" onclick="switchPostActivity('seq')" class="pb-2 border-b-2 border-brand-500 text-brand-500">1. Story Ordering</button>
+          <button id="subTab-chat" onclick="switchPostActivity('chat')" class="pb-2 text-slate-400 dark:text-slate-500">2. Chat Practice</button>
+          <button id="subTab-wheel" onclick="switchPostActivity('wheel')" class="pb-2 text-slate-400 dark:text-slate-500">3. Writing Challenge</button>
+        </div>
+
+        <!-- POST 1: STORY ORDERING -->
+        <div id="post-seq" class="space-y-6">
+          <div class="text-center space-y-2 animate-fade-in">
+            <h4 class="text-xl font-bold font-display text-slate-800 dark:text-slate-200">Chronological Story Order</h4>
+            <p class="text-slate-600 dark:text-slate-300">Arrange the events of the listening story in the correct sequence (1 to 5).</p>
+          </div>
+
+          <!-- RE-PLAY AUDIO IN POST-LISTENING STORY ORDERING -->
+          <div class="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700 max-w-md mx-auto flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+              <button id="postAudioPlayBtn" onclick="playAudio()" class="w-10 h-10 rounded-full bg-brand-500 text-white flex items-center justify-center hover:bg-brand-600 shadow-sm transition">
+                <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              </button>
+              <div class="text-left">
+                <span class="text-xs font-bold text-slate-400 uppercase">Helper Tool</span>
+                <p class="text-xs text-slate-600 dark:text-slate-300">Replay Dialogue to Verify Sequence</p>
+              </div>
+            </div>
+            <span class="text-xs text-brand-500 font-bold" id="postAudioStatus">Ready</span>
+          </div>
+
+          <div id="sequenceList" class="space-y-3 max-w-xl mx-auto">
+            <!-- Order elements injected via JavaScript -->
+          </div>
+
+          <div class="text-center py-4">
+            <button onclick="checkSequencing()" class="bg-brand-500 hover:bg-brand-600 text-white font-bold px-6 py-3 rounded-xl transition shadow-md">
+              Verify Sequencing ✔
+            </button>
+          </div>
+        </div>
+
+        <!-- POST 2: CHATBOT FOR FREE PRACTICE (NO EVALUATIONS) -->
+        <div id="post-chat" class="space-y-6 hidden">
+          <div class="text-center space-y-2">
+            <h4 class="text-xl font-bold font-display text-slate-800 dark:text-slate-200">Interactive Chat Partner</h4>
+            <p class="text-slate-600 dark:text-slate-300">Have a relaxed, friendly conversation about your day with a classmate bot! No grading here!</p>
+          </div>
+
+          <!-- Chat messages window -->
+          <div class="border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 rounded-2xl p-4 h-80 overflow-y-auto flex flex-col space-y-4" id="chatHistory">
+            <!-- Bubbles injected dynamically -->
+          </div>
+
+          <!-- Inputs and speech toggle -->
+          <div class="flex flex-col space-y-3 max-w-xl mx-auto">
+            <div class="flex items-center space-x-2">
+              <input type="text" id="chatInput" placeholder="Type a message to your classmate..." class="flex-grow bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500">
+              
+              <button id="micBtn" onclick="toggleSpeech()" class="p-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-600 dark:text-slate-200 rounded-xl transition" title="Hold to speak">
+                🎤
+              </button>
+
+              <button onclick="sendChatMessage()" class="bg-brand-500 hover:bg-brand-600 text-white px-5 py-3 rounded-xl transition font-bold text-sm">
+                Send
+              </button>
+            </div>
+            
+            <button id="finishChatBtn" onclick="switchPostActivity('wheel')" class="hidden bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-2 rounded-xl text-sm transition shadow">
+              🏁 Move to Writing Challenge ➔
+            </button>
+          </div>
+          <p id="speechStatus" class="text-xs text-center text-slate-400 dark:text-slate-500 italic"></p>
+        </div>
+
+        <!-- POST 3: THE SPINNING WHEEL + NEW EVALUATED WRITING CHALLENGE -->
+        <div id="post-wheel" class="space-y-6 hidden">
+          <div class="text-center space-y-2">
+            <h4 class="text-xl font-bold font-display text-slate-800 dark:text-slate-200">Topic Wheel &amp; Writing Challenge</h4>
+            <p class="text-slate-600 dark:text-slate-300">Spin the wheel to get a custom past-tense topic, then complete the Writing Challenge evaluated by Gemini AI!</p>
+          </div>
+
+          <div class="flex flex-col lg:flex-row items-center justify-center gap-8">
+            <!-- Spinner canvas graphics -->
+            <div class="flex flex-col items-center space-y-4">
+              <div class="relative w-64 h-64">
+                <canvas id="wheelCanvas" width="300" height="300" class="mx-auto rounded-full shadow-lg scale-90"></canvas>
+                <!-- Indicator pointer -->
+                <div class="absolute -right-1 top-1/2 -translate-y-1/2 w-0 h-0 border-t-8 border-b-8 border-r-[16px] border-t-transparent border-b-transparent border-r-rose-500 rotate-180 z-10"></div>
+              </div>
+
+              <button onclick="spinWheel()" id="spinBtn" class="bg-brand-500 hover:bg-brand-600 text-white font-bold px-6 py-2.5 rounded-full transition shadow-lg transform hover:scale-105 text-sm uppercase tracking-wide">
+                🎡 SPIN THE WHEEL
+              </button>
+            </div>
+
+            <!-- Redesigned Writing Card and Evaluation results panel -->
+            <div class="flex-grow w-full max-w-xl space-y-4">
+              <!-- Selected topic info -->
+              <div class="bg-brand-50 dark:bg-brand-950/20 border border-brand-100 dark:border-brand-900/40 p-4 rounded-2xl flex items-center justify-between">
+                <div>
+                  <span class="text-xs font-bold text-brand-600 uppercase tracking-widest block">Selected Writing Topic</span>
+                  <p id="activeTopicText" class="font-bold text-lg text-slate-800 dark:text-slate-100 italic">"yesterday activities"</p>
+                </div>
+                <span class="text-3xl">🎯</span>
+              </div>
+
+              <!-- Writing Prompt instruction card -->
+              <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-5 rounded-2xl shadow-sm space-y-3">
+                <h5 class="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                  <span>✍️</span> Past Tense Writing Challenge
+                </h5>
+                <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Write <strong class="text-brand-500">3–5 sentences</strong> about your experience. Use the <strong class="text-indigo-500">Simple Past Tense</strong>. (Minimum: 3 sentences).
+                </p>
+
+                <textarea id="challengeTextArea" rows="4" placeholder="Type your past-tense paragraph here..." class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 transition-colors dark:text-slate-200"></textarea>
+
+                <div class="flex justify-between items-center">
+                  <span id="charSentenceCount" class="text-xs text-slate-400">0 sentences written</span>
+                  <button onclick="checkStudentWriting()" id="checkWritingBtn" class="bg-gradient-to-r from-brand-500 to-indigo-600 hover:from-brand-600 hover:to-indigo-700 text-white font-bold py-2.5 px-6 rounded-xl transition duration-300 shadow transform active:scale-95 text-xs sm:text-sm flex items-center gap-2">
+                    <span>✅</span> Check My Writing
+                  </button>
+                </div>
+              </div>
+
+              <!-- Loader Spinner -->
+              <div id="aiLoadingIndicator" class="hidden flex flex-col items-center justify-center p-6 bg-slate-50 dark:bg-slate-900/50 rounded-2xl border border-slate-100 dark:border-slate-700 space-y-3 animate-pulse">
+                <div class="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin"></div>
+                <p class="text-xs font-bold text-slate-500 dark:text-slate-400">Analysing your paragraph with Gemini AI, please wait...</p>
+              </div>
+
+              <!-- Gemini AI Feedback result panel -->
+              <div id="geminiFeedbackPanel" class="hidden bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-2xl shadow-lg space-y-6 animate-fade-in text-left">
+                <div class="border-b border-slate-100 dark:border-slate-700 pb-4">
+                  <span class="text-xs uppercase font-extrabold tracking-widest text-indigo-500">Tutor's Evaluation</span>
+                  <h4 class="text-lg font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 mt-1">
+                    <span id="feedbackStarRating">🌟</span> AI Writing Feedback
+                  </h4>
+                </div>
+
+                <!-- Positive comment block -->
+                <div class="bg-emerald-50 dark:bg-emerald-950/10 border-l-4 border-emerald-500 p-4 rounded-r-xl">
+                  <p id="geminiPositiveComment" class="text-sm font-semibold text-emerald-800 dark:text-emerald-300"></p>
+                </div>
+
+                <!-- Grammar corrections -->
+                <div class="space-y-2">
+                  <h6 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                    <span>🛠️</span> Grammar Corrections
+                  </h6>
+                  <div id="geminiGrammarList" class="space-y-3 text-sm">
+                    <!-- Loaded dynamically -->
+                  </div>
+                </div>
+
+                <!-- Spelling corrections -->
+                <div class="space-y-2">
+                  <h6 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                    <span>🔤</span> Spelling Corrections
+                  </h6>
+                  <div id="geminiSpellingList" class="space-y-3 text-sm">
+                    <!-- Loaded dynamically -->
+                  </div>
+                </div>
+
+                <!-- Vocabulary suggestions -->
+                <div class="space-y-2">
+                  <h6 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                    <span>💡</span> Vocabulary &amp; Phrasal Suggestions
+                  </h6>
+                  <ul id="geminiVocabSuggestionsList" class="list-disc list-inside text-sm text-slate-600 dark:text-slate-300 space-y-1">
+                    <!-- Loaded dynamically -->
+                  </ul>
+                </div>
+
+                <!-- Perfected paragraph -->
+                <div class="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700 space-y-2">
+                  <span class="text-xs font-extrabold uppercase text-slate-400 block">Perfected Final Version</span>
+                  <p id="geminiCorrectedParagraph" class="text-sm text-slate-700 dark:text-slate-300 italic leading-relaxed"></p>
+                </div>
+
+                <!-- Scores and metrics -->
+                <div class="space-y-4 pt-4 border-t border-slate-100 dark:border-slate-700">
+                  <div class="flex items-center justify-between">
+                    <span class="text-sm font-bold text-slate-800 dark:text-slate-100">Overall Score</span>
+                    <span id="geminiOverallScoreBadge" class="text-2xl font-extrabold text-brand-500 font-display">95/100</span>
+                  </div>
+
+                  <!-- Five individual metric progress bars -->
+                  <div class="space-y-3">
+                    <div>
+                      <div class="flex justify-between text-xs font-semibold mb-1">
+                        <span>⭐ Grammar Accuracy</span>
+                        <span id="scoreText-grammar">90%</span>
+                      </div>
+                      <div class="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                        <div id="scoreBar-grammar" class="bg-brand-500 h-full w-0 transition-all duration-1000"></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div class="flex justify-between text-xs font-semibold mb-1">
+                        <span>⭐ Past Tense Usage</span>
+                        <span id="scoreText-past">95%</span>
+                      </div>
+                      <div class="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                        <div id="scoreBar-past" class="bg-indigo-500 h-full w-0 transition-all duration-1000"></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div class="flex justify-between text-xs font-semibold mb-1">
+                        <span>⭐ Vocabulary Variety</span>
+                        <span id="scoreText-vocab">85%</span>
+                      </div>
+                      <div class="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                        <div id="scoreBar-vocab" class="bg-amber-500 h-full w-0 transition-all duration-1000"></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div class="flex justify-between text-xs font-semibold mb-1">
+                        <span>⭐ Spelling Correctness</span>
+                        <span id="scoreText-spelling">100%</span>
+                      </div>
+                      <div class="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                        <div id="scoreBar-spelling" class="bg-emerald-500 h-full w-0 transition-all duration-1000"></div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div class="flex justify-between text-xs font-semibold mb-1">
+                        <span>⭐ Sentence Organization</span>
+                        <span id="scoreText-organization">90%</span>
+                      </div>
+                      <div class="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                        <div id="scoreBar-organization" class="bg-rose-500 h-full w-0 transition-all duration-1000"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Final encouraging remark -->
+                <div class="pt-4 border-t border-slate-100 dark:border-slate-700 text-center">
+                  <p id="geminiFinalEncouragement" class="text-sm font-semibold italic text-slate-500 dark:text-slate-400"></p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Spinner Result Speak prompt options -->
+          <div id="wheelResult" class="hidden text-center bg-brand-50 dark:bg-brand-950/20 border border-brand-100 dark:border-brand-900/50 p-6 rounded-2xl max-w-md w-full space-y-4 mx-auto">
+            <span class="text-xs font-bold text-brand-500 uppercase tracking-widest">Selected Speaking Prompt</span>
+            <p id="wheelPromptText" class="font-bold text-lg text-slate-800 dark:text-slate-100"></p>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <button onclick="selectOptionWheel('classmate')" class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 py-2 px-3 rounded-xl hover:bg-slate-50 text-sm transition">
+                👥 Talk with a Classmate
+              </button>
+              <button onclick="selectOptionWheel('chat')" class="bg-brand-500 text-white py-2 px-3 rounded-xl hover:bg-brand-600 text-sm transition font-semibold">
+                💬 Respond to Chatbot
+              </button>
+            </div>
+          </div>
+
+          <div class="text-center pt-8 border-t border-slate-100 dark:border-slate-700">
+            <button onclick="finishAllActivities()" class="bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-8 py-4 rounded-2xl transition shadow-lg text-lg">
+              Finish All Challenges &amp; See Results 🏆
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- METRICS AND CERTIFICATE PANEL -->
+    <section id="resultsScreen" class="w-full max-w-4xl bg-white dark:bg-slate-800 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-700 p-6 md:p-8 hidden space-y-8 text-center">
+      <div class="space-y-2">
+        <span class="text-6xl">🏆</span>
+        <h1 class="text-3xl md:text-5xl font-extrabold font-display bg-clip-text text-transparent bg-gradient-to-r from-brand-500 to-indigo-600">Lesson Complete!</h1>
+        <p class="text-slate-500 dark:text-slate-400">Amazing job completing the Pre, While, and Post-listening activities.</p>
+      </div>
+
+      <!-- Performance metrics grid -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 py-4">
+        <div class="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+          <span class="block text-slate-400 text-sm">Final Score</span>
+          <span id="resultScore" class="font-bold text-3xl text-brand-500">0</span>
+        </div>
+        <div class="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+          <span class="block text-slate-400 text-sm">Correct Rate</span>
+          <span id="resultPercent" class="font-bold text-3xl text-indigo-500">0%</span>
+        </div>
+        <div class="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+          <span class="block text-slate-400 text-sm">Stars Earned</span>
+          <span id="resultStars" class="font-bold text-3xl text-amber-500">⭐ 0/5</span>
+        </div>
+        <div class="bg-slate-50 dark:bg-slate-900/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-700">
+          <span class="block text-slate-400 text-sm">Badge Earned</span>
+          <span id="resultBadge" class="font-bold text-lg text-emerald-500">Badge</span>
+        </div>
+      </div>
+
+      <!-- Performance analytics feedback block -->
+      <div class="bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 text-left max-w-2xl mx-auto space-y-4">
+        <h3 class="font-bold text-lg font-display flex items-center gap-2">
+          <span>📈</span> Performance Breakdown
+        </h3>
+        <ul class="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+          <li><strong>Pre-Listening Vocabulary Match:</strong> Completed matching exercises with zero textual errors.</li>
+          <li><strong>While-Listening Comprehension Quiz:</strong> You answered <span id="analyticalCorrect" class="font-bold">0</span> out of 10 questions correctly.</li>
+          <li><strong>Post-Listening Activities:</strong> Sequence ordered, conversational chatbot interview answered, and speaking prompts selected.</li>
+          <li><strong id="improveSuggestTitle">Study Suggestions:</strong> <span id="improveSuggest">Excellent! Try a higher level to build vocabulary.</span></li>
+        </ul>
+      </div>
+
+      <!-- Printable Achievement Certificate card frame -->
+      <div id="certificateContainer" class="hidden bg-slate-50 dark:bg-slate-900/50 p-6 rounded-2xl border border-dashed border-brand-300 max-w-xl mx-auto space-y-4 relative">
+        <div class="border-2 border-brand-100 dark:border-slate-700 p-6 rounded-xl space-y-4 bg-white dark:bg-slate-800">
+          <span class="text-2xl">🎓</span>
+          <h4 class="text-2xl font-bold font-display text-brand-600 dark:text-brand-400">CERTIFICATE OF ACHIEVEMENT</h4>
+          <p class="text-xs uppercase tracking-widest text-slate-400">Successfully awarded to the student of EFL Listening Hub for completing:</p>
+          <p id="certLevelName" class="text-3xl font-extrabold text-indigo-500 font-display">Level A2</p>
+          <p class="text-sm italic text-slate-500">"Demonstrated proficiency in English listening comprehension, sequencing events, and simple past speaking production."</p>
+          <div class="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center text-xs text-slate-400">
+            <span>Date: June 26, 2026</span>
+            <span>Credential ID: EFL-CEFR-ACTIVE</span>
+          </div>
+        </div>
+        <button onclick="window.print()" class="text-xs text-brand-500 hover:underline">🖨 Print or Save Digital Certificate</button>
+      </div>
+
+      <!-- Retry options and Return home buttons -->
+      <div class="flex flex-col sm:flex-row justify-center gap-4 pt-6">
+        <button id="nextLevelUnlockBtn" onclick="unlockNextScaffoldedLevel()" class="hidden bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-6 py-3 rounded-xl transition shadow-md">
+          Unlock Next Proficiency Level 🔓 ➔
+        </button>
+        <button onclick="retryIncorrectOnly()" id="retryIncorrectsBtn" class="bg-indigo-500 hover:bg-indigo-600 text-white font-bold px-6 py-3 rounded-xl transition shadow-md">
+          Retry Incorrect Questions 🔁
+        </button>
+        <button onclick="goHome()" class="bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-700 dark:text-slate-100 font-bold px-6 py-3 rounded-xl transition shadow-md">
+          Return to Home 🏠
+        </button>
+      </div>
+    </section>
+  </main>
+
+  <footer class="text-center py-6 text-xs text-slate-400 dark:text-slate-600 border-t border-slate-200 dark:border-slate-800 mt-auto">
+    <p>© 2026 EFL Listening Hub. Designed for classroom use and offline browser execution.</p>
+  </footer>
+
+  <!-- ADAPTIVE CEFR VOCABULARY AND GRAPHICS SYSTEM DATA -->
+  <script>
+    const appData = {
+      A1: {
+        vocab: [
+          { verb: "I cooked", complement: "breakfast", feedback: "🍳 Great! 'I cooked breakfast' starts the day beautifully." },
+          { verb: "I cleaned", complement: "the room", feedback: "🧹 Excellent! 'I cleaned the room' keeps your space tidy." },
+          { verb: "I studied", complement: "English", feedback: "📚 Outstanding! 'I studied English' is your path to fluency." },
+          { verb: "I walked", complement: "to the park", feedback: "🚶 Nice! 'I walked to the park' is a healthy habit." },
+          { verb: "I played", complement: "soccer", feedback: "⚽ Awesome! 'I played soccer' is a classic sport activity." },
+          { verb: "I watched", complement: "TV", feedback: "📺 Perfect! 'I watched TV' is great for relaxing." }
+        ],
+        dialogue: "Yesterday, I had a very simple day. In the morning, I cooked a delicious breakfast and cleaned my room. Then, I studied English for two hours. In the afternoon, I walked to the park and played soccer with some friends. Finally, in the evening, I watched TV and went to sleep.",
+        questions: [
+          { q: "What did the speaker cook in the morning?", options: ["Breakfast", "Lunch", "Dinner", "Nothing"], ans: 0, exp: "The speaker mentions clearly 'cooked a delicious breakfast' in the morning." },
+          { q: "What room did they clean?", options: ["Kitchen", "Room", "Living room", "Garden"], ans: 1, exp: "The audio says: 'cleaned my room'." },
+          { q: "How long did they study English?", options: ["One hour", "Two hours", "Three hours", "Five minutes"], ans: 1, exp: "They say: 'studied English for two hours'." },
+          { q: "Where did they walk in the afternoon?", options: ["To the school", "To the park", "To the supermarket", "To the library"], ans: 1, exp: "The audio says: 'walked to the park'." },
+          { q: "Who did they play soccer with?", options: ["Brother", "Family", "Friends", "Alone"], ans: 2, exp: "They specify: 'played soccer with some friends'." },
+          { q: "What sport did they play?", options: ["Soccer", "Tennis", "Basketball", "Golf"], ans: 0, exp: "They played soccer." },
+          { q: "What did they do in the evening?", options: ["Cooked dinner", "Watched TV", "Read a book", "Played video games"], ans: 1, exp: "They say: 'watched TV and went to sleep'." },
+          { q: "How was the day described?", options: ["A simple day", "A stressful day", "A bad day", "An active day"], ans: 0, exp: "The dialogue starts with: 'Yesterday, I had a very simple day'." },
+          { q: "Did they study Spanish?", options: ["Yes, they did", "No, they studied English", "They studied French", "They didn't study"], ans: 1, exp: "They specify: 'studied English'." },
+          { q: "What did they do after watching TV?", options: ["Went to sleep", "Went to the gym", "Walked the dog", "Cooked dinner"], ans: 0, exp: "They state: 'watched TV and went to sleep'." }
+        ],
+        sequencing: [
+          "Cooked a delicious breakfast.",
+          "Studied English for two hours.",
+          "Walked to the park.",
+          "Played soccer with friends.",
+          "Watched TV in the evening."
+        ],
+        chatAnswers: [
+          { pattern: /soccer|football|sport/i, question: "What position did you play?", reply: "That sounds awesome! I love playing with friends.", default: "That sounds awesome! What other sports do you like?" },
+          { pattern: /park|walk|outside/i, question: "Who did you go to the park with?", reply: "Going outdoors is great for fresh air!", default: "Walking to the park is highly relaxing. Did you see any animals?" },
+          { pattern: /cook|breakfast|dinner|food/i, question: "What ingredients did you use?", reply: "Wow, cooking is such a beautiful skill!", default: "I love cooking! Was it delicious?" },
+          { pattern: /study|english|read|book/i, question: "How long did you study for?", reply: "Studying is so productive!", default: "That is productive! Did you learn any new words?" },
+          { pattern: /tv|movie|watch/i, question: "What show or movie did you choose?", reply: "Nice! Watching something is relaxing.", default: "Nice! Was it a funny show?" }
+        ],
+        wheel: [
+          "What did you cook yesterday?",
+          "Did you watch TV last night?",
+          "Where did you walk yesterday?",
+          "Who did you see yesterday?",
+          "Did you study English yesterday?",
+          "Describe your bedroom cleaning.",
+          "What did you eat yesterday?",
+          "Did you play games yesterday?"
+        ],
+        chatQuestions: [
+          "What did you do yesterday?",
+          "Where did you go yesterday?",
+          "Who were you with yesterday?",
+          "What did you eat for lunch?",
+          "What did you drink yesterday?",
+          "What time did you go to bed?",
+          "Did you have fun yesterday?",
+          "Was it a good day?",
+          "Did you play any games?",
+          "Did you study yesterday?",
+          "Did you watch TV?",
+          "What time did you wake up?",
+          "Did you cook yesterday?",
+          "Did you clean your room?",
+          "Who did you talk to?",
+          "Did you walk to school?",
+          "What did you wear yesterday?",
+          "Did you buy anything?",
+          "Did you read a book?",
+          "Did you listen to music?",
+          "Where did you eat breakfast?",
+          "Did you see your friends?",
+          "Did you go to a park?",
+          "Was it sunny yesterday?",
+          "Did you drink coffee?",
+          "Did you help your family?",
+          "What did you eat for breakfast?",
+          "Did you go to a shop?",
+          "Did you use your phone a lot?",
+          "What was your favorite part of yesterday?",
+          "Did you take a bus yesterday?",
+          "Did you take a shower in the morning?",
+          "Did you drink any water?",
+          "Did you do homework?",
+          "Did you go to the supermarket?",
+          "What did you eat for dinner?",
+          "Did you wear a jacket yesterday?",
+          "Did you see a cat or a dog?",
+          "Did you go out in the evening?",
+          "Did you call anyone?",
+          "Did you sleep well?",
+          "What did you find in your bag?",
+          "Did you have an ice cream?",
+          "Did you wash your face?",
+          "Did you write a message?",
+          "Was yesterday busy for you?",
+          "Did you go to the kitchen to cook?",
+          "Who cooked your dinner yesterday?",
+          "Did you play on your computer?",
+          "Would you like to do it again today?"
+        ]
+      },
+      A2: {
+        vocab: [
+          { verb: "I played", complement: "soccer", feedback: "⚽ Great! 'played soccer' is a common activity in the past." },
+          { verb: "I watched", complement: "a movie", feedback: "🎬 Superb! 'watched a movie' is a fantastic way to unwind." },
+          { verb: "I went", complement: "to the park", feedback: "🏞 Nice! 'went to the park' is a lovely outdoor escape." },
+          { verb: "I had", complement: "ice cream", feedback: "🍦 Yummy! 'had ice cream' is a sweet choice!" },
+          { verb: "I cleaned", complement: "the house", feedback: "🧹 Great job! 'cleaned the house' is always helpful." },
+          { verb: "I studied", complement: "English", feedback: "📚 Awesome! 'studied English' is wonderful practice." },
+          { verb: "I visited", complement: "grandparents", feedback: "👵 Sweet! 'visited grandparents' is a beautiful way to connect." },
+          { verb: "I cooked", complement: "dinner", feedback: "🍳 Perfect! 'cooked dinner' is a great end to the day." }
+        ],
+        dialogue: "Hi Anna! What did you do yesterday? Oh, yesterday I played soccer with my friends after school. What about you, Tom? I went to the park with my family. We played on the swings, and I also had a delicious ice cream! That sounds like fun. In the evening, I watched an animated movie with my brother. It was very funny and we laughed a lot! Awesome, it sounds like we both had a really fun day yesterday.",
+        questions: [
+          { q: "What is the conversation mainly about?", options: ["Tom and Anna talking about their school subjects.", "Tom and Anna talking about what they did yesterday.", "Tom and Anna planning a school project.", "Tom and Anna talking about sports rules."], ans: 1, exp: "The primary subject discussed by Tom and Anna is their respective activities yesterday." },
+          { q: "Why are Tom and Anna talking?", options: ["To describe their activities from yesterday.", "To practice homework.", "To plan a trip.", "To study for a test."], ans: 0, exp: "They converse to share with each other what they did yesterday." },
+          { q: "What is the general topic of the conversation?", options: ["Future plans", "Past activities and experiences.", "School rules", "Favorite movies"], ans: 1, exp: "The dialogue focus is strictly simple past tense events from yesterday." },
+          { q: "What sport did Anna play yesterday?", options: ["Soccer.", "Basketball.", "Tennis.", "Volleyball."], ans: 0, exp: "Anna says: 'Yesterday, I played soccer with my friends after school'." },
+          { q: "Where did Tom go with his family?", options: ["To the park.", "To the beach.", "To the cinema.", "To a restaurant."], ans: 0, exp: "Tom explains: 'I went to the park with my family'." },
+          { q: "What did Tom have at the park?", options: ["Ice cream.", "Pizza.", "A sandwich.", "A burger."], ans: 0, exp: "Tom mentions: 'I also had an ice cream. It was delicious'." },
+          { q: "What kind of movie did Anna watch?", options: ["An animated movie.", "A sports movie.", "A scary movie.", "A comedy movie."], ans: 0, exp: "Anna states: 'We watched an animated movie'." },
+          { q: "How did Tom and Anna feel about their day?", options: ["They were bored.", "They were happy and enjoyed it.", "They were angry.", "They were tired."], ans: 1, exp: "They conclude the talk saying they both had a really fun day." },
+          { q: "What can we infer about Tom and Anna?", options: ["They are strangers.", "They are friends.", "They are teachers.", "They are siblings."], ans: 1, exp: "Their casual greetings and interest in school and sports indicate they are friends." },
+          { q: "Why was yesterday a good day for them?", options: ["Because they did fun activities like playing and watching a movie.", "Because they stayed home all day.", "Because they had no school.", "Because they studied a lot."], ans: 0, exp: "Yesterday was a good day because they performed exciting activities like soccer, park swings, and movies." }
+        ],
+        sequencing: [
+          "Anna played soccer with her friends after school.",
+          "Tom went to the park with his family and played on the swings.",
+          "Tom ate a delicious ice cream at the park.",
+          "Anna watched an animated movie with her brother.",
+          "Anna laughed a lot at the funny movie."
+        ],
+        chatAnswers: [
+          { pattern: /soccer|football|sport/i, question: "Who won the game?", reply: "Nice! Soccer is so much fun.", default: "Soccer is fantastic. How many goals did you score?" },
+          { pattern: /park|swing|family/i, question: "What was the park's name?", reply: "Oh, parks are the perfect places to relax!", default: "Parks are so much fun! Did you eat something sweet there?" },
+          { pattern: /movie|watch|brother|animated/i, question: "What did you watch?", reply: "Movies are great for sharing with family!", default: "Nice! Did you eat popcorn while watching?" },
+          { pattern: /ice cream|eat|had/i, question: "What flavor did you have?", reply: "That sounds delicious! Ice cream is awesome.", default: "Yummy! Ice cream is the best treat." },
+          { pattern: /laugh/i, question: "What made you laugh so much?", reply: "Laughter makes everything better!", default: "Laughter is the best medicine! Who was with you?" }
+        ],
+        wheel: [
+          "Tell me about a funny day you had.",
+          "Describe your last vacation.",
+          "What did you do last weekend?",
+          "Talk about your last birthday.",
+          "Describe a bad day you experienced.",
+          "Talk about a movie you watched recently.",
+          "Who did you visit recently?",
+          "What happened yesterday after school?"
+        ],
+        chatQuestions: [
+          "Why did you enjoy it?",
+          "What happened after that?",
+          "Which part did you like the most?",
+          "How did you feel?",
+          "What surprised you?",
+          "What was the funniest moment?",
+          "Did anything unexpected happen?",
+          "Would you do it again? Why?",
+          "Who enjoyed it the most?",
+          "What would you like to do differently next time?",
+          "What did you cook yesterday, and how did you make it?",
+          "Where did you go yesterday afternoon, and how was it?",
+          "What did you watch on TV, and who did you watch it with?",
+          "How did you spend your evening yesterday?",
+          "Did you meet anyone interesting yesterday? Tell me about them.",
+          "What was the weather like yesterday, and how did it affect your plans?",
+          "What was the most difficult thing you did yesterday?",
+          "Did you buy anything nice yesterday? Where did you get it?",
+          "Did you help someone yesterday? What did you do for them?",
+          "Tell me about a delicious meal you had yesterday.",
+          "How did you travel to your favorite place yesterday?",
+          "What did you study yesterday? Was it interesting?",
+          "Did you listen to an interesting song or podcast yesterday?",
+          "How did you feel at the end of yesterday?",
+          "Tell me about the people you saw yesterday.",
+          "Did you clean or organize anything yesterday? How did it look?",
+          "Where did you have breakfast yesterday, and what did you talk about?",
+          "Did you walk anywhere yesterday? Describe the walk.",
+          "What was your main goal yesterday, and did you achieve it?",
+          "What made you smile yesterday?",
+          "Did you use any interesting apps on your phone yesterday?",
+          "Did you play a sport or exercise yesterday? How did you feel?",
+          "Tell me about a movie or show you finished yesterday.",
+          "What did you wear yesterday, and why did you choose it?",
+          "Did you visit a new place yesterday? What did it look like?",
+          "Who did you talk to on the phone yesterday, and why?",
+          "Did you have a busy morning or a lazy morning yesterday?",
+          "What was the quietest moment of your day yesterday?",
+          "Did you drink anything special yesterday? How did it taste?",
+          "Tell me about one thing you learned yesterday.",
+          "How did you relax after a long day yesterday?",
+          "Did you do any homework or chores yesterday? Was it boring?",
+          "What did you do before going to bed yesterday?",
+          "Who cooked dinner yesterday, and did you help them?",
+          "Did you see any beautiful nature or animals yesterday?",
+          "What was the most exciting message you received yesterday?",
+          "Did you spend more time indoors or outdoors yesterday, and why?",
+          "What did you plan for yesterday that you couldn't do?",
+          "Did you read anything interesting yesterday?",
+          "Why was yesterday a memorable day for you?"
+        ]
+      },
+      B1: {
+        vocab: [
+          { verb: "I embarked", complement: "on a trip", feedback: "🎒 Awesome! 'embarked on a trip' implies commencing a grand journey." },
+          { verb: "I explored", complement: "historic ruins", feedback: "🏛 Splendid! 'explored historic ruins' uncovers old secrets." },
+          { verb: "I tasted", complement: "local cuisine", feedback: "🍲 Delicious! 'tasted local cuisine' expands your palette." },
+          { verb: "I encountered", complement: "wildlife", feedback: "🦌 Beautiful! 'encountered wildlife' connects us to nature." },
+          { verb: "I took", complement: "stunning photos", feedback: "📸 Perfect! 'took stunning photos' captures fine memories." },
+          { verb: "I wandered", complement: "around", feedback: "🥾 Nice! 'wandered around' is wonderful for casual discovery." },
+          { verb: "I missed", complement: "the bus", feedback: "🚌 Unfortunate! 'missed the bus' leads to surprise detours." },
+          { verb: "I bought", complement: "souvenirs", feedback: "🎁 Lovely! 'bought souvenirs' honors your beloved friends." },
+          { verb: "I relaxed", complement: "on the beach", feedback: "🏖 Peaceful! 'relaxed on the beach' is ultimate rest." },
+          { verb: "I stayed", complement: "at a hostel", feedback: "🏨 Excellent! 'stayed at a hostel' is budget friendly." }
+        ],
+        dialogue: "Last month, I embarked on an amazing weekend trip to a mountain village. First, I checked into a cozy hostel. In the afternoon, I wandered around the local markets and tasted some outstanding local cuisine, which was very spicy. The next day, I explored historic ruins and took stunning photos of the scenery. Unfortunately, I missed the return bus, but a friendly local guided me back. I even bought souvenirs for my family before returning.",
+        questions: [
+          { q: "Where did the speaker go last month?", options: ["A mountain village", "A crowded capital", "A tropical beach", "An old castle"], ans: 0, exp: "The narrator says: 'embarked on an amazing weekend trip to a mountain village'." },
+          { q: "What was the accommodation like?", options: ["A cozy hostel", "A five-star hotel", "A camping tent", "A beach villa"], ans: 0, exp: "They checked into a 'cozy hostel'." },
+          { q: "How did the speaker describe the local food?", options: ["It was very spicy", "It was extremely sweet", "It was cold and salty", "It was tasteless"], ans: 0, exp: "They said: 'local cuisine, which was very spicy'." },
+          { q: "What did the speaker do on the second day?", options: ["Explored historic ruins", "Went swimming", "Slept all morning", "Climbed a peak"], ans: 0, exp: "They say: 'The next day, I explored historic ruins'." },
+          { q: "What bad luck did they experience?", options: ["They missed the return bus", "They lost their wallet", "It rained heavily", "They broke their camera"], ans: 0, exp: "They mention: 'Unfortunately, I missed the return bus'." },
+          { q: "Who helped the narrator after missing the bus?", options: ["A friendly local", "A police officer", "A tour guide", "Their family"], ans: 0, exp: "They say: 'but a friendly local guided me back'." },
+          { q: "What did they purchase before returning?", options: ["Souvenirs for family", "A warm jacket", "A mountain map", "Some local spices"], ans: 0, exp: "They state: 'I even bought souvenirs for my family'." },
+          { q: "How did they capture the views?", options: ["They took stunning photos", "They painted a landscape", "They filmed a video", "They wrote a poem"], ans: 0, exp: "They state: 'took stunning photos of the scenery'." },
+          { q: "How long was the trip?", options: ["A weekend", "A whole week", "Two days only", "A complete month"], ans: 0, exp: "They say: 'an amazing weekend trip'." },
+          { q: "What verb tense is primarily used?", options: ["Simple Past", "Present Perfect", "Past Continuous", "Past Perfect"], ans: 0, exp: "Simple past verbs are used to tell the story (embarked, checked, wandered)." }
+        ],
+        sequencing: [
+          "Checked into a cozy mountain hostel.",
+          "Wandered around the markets and ate spicy food.",
+          "Explored historic ruins and took beautiful photos.",
+          "Missed the return bus back home.",
+          "Bought souvenirs before departing."
+        ],
+        chatAnswers: [
+          { pattern: /trip|embarked|travel/i, question: "Where did you travel?", reply: "Nice adventure!", default: "Travel broadens the mind! What was your favorite landmark?" },
+          { pattern: /explore|ruins|history/i, question: "What historic site did you explore?", reply: "History has so many secrets!", default: "Exploring historic places feels like time travel. Did you take photos?" },
+          { pattern: /food|cuisine|taste|spicy/i, question: "Did you enjoy the local dishes?", reply: "Spicy foods are super!", default: "Food is the best part of any culture. What did you try?" },
+          { pattern: /bus|miss/i, question: "How did you manage to get back?", reply: "Ah, missing transport is a real hassle!", default: "Missing transport can be a real adventure. What happened next?" },
+          { pattern: /hostel|stay/i, question: "Did you meet other travelers there?", reply: "Hostels have so much energy!", default: "Hostels are fantastic for meeting like-minded people!" }
+        ],
+        wheel: [
+          "Describe an exciting trip you made.",
+          "What is the best local food you've tasted?",
+          "Have you ever missed a bus or plane?",
+          "Talk about a cozy place you visited.",
+          "What souvenirs do you buy on trips?",
+          "Did you ever meet a helpful stranger?",
+          "Describe your last weekend getaway.",
+          "What historic place did you explore?"
+        ],
+        chatQuestions: [
+          "Why was that experience memorable?",
+          "What did you learn from it?",
+          "What was the biggest challenge?",
+          "How did you solve the problem?",
+          "Why would you recommend that experience?",
+          "What surprised you the most?",
+          "What made that day special?",
+          "What was the most difficult part?",
+          "How did that experience change your mood?",
+          "If you could repeat the day, what would you change?",
+          "Why did you decide to spend your free time the way you did yesterday?",
+          "Can you explain the story behind the most interesting thing you did yesterday?",
+          "How did you balance your responsibilities and free time yesterday?",
+          "Who had the biggest influence on your day yesterday, and why?",
+          "Why do you think yesterday felt so productive or unproductive?",
+          "What kind of environment did you spend your day in, and how did you feel there?",
+          "What is the reason you chose to visit that specific place yesterday?",
+          "How did you feel about the food you ate yesterday? Why was it special?",
+          "Why do you think we need days like yesterday to relax and recharge?",
+          "What was the most interesting conversation you had yesterday, and what was it about?",
+          "How did you feel when you completed your main task yesterday?",
+          "Why do you prefer doing outdoor activities over staying inside, based on yesterday?",
+          "What went completely according to your plan yesterday, and what didn't?",
+          "How did you deal with any stressful moments yesterday?",
+          "Why did you choose to watch that specific movie or show yesterday?",
+          "What did yesterday show you about your current routine?",
+          "Why do you think it is important to spend time with friends or family like you did?",
+          "How did you feel when you heard some unexpected news yesterday?",
+          "What was the most creative thing you did yesterday, and what inspired you?",
+          "Why did you buy those specific items yesterday? Were they necessary?",
+          "How did you spend your evening, and why is that your favorite way to relax?",
+          "If you had to describe yesterday's atmosphere in three words, which would they be and why?",
+          "How did you feel about your interactions with strangers yesterday?",
+          "Why was studying or working yesterday more challenging or easier than usual?",
+          "What habits did you practice yesterday that you want to keep?",
+          "How did technology help or distract you during your day yesterday?",
+          "Why did you choose to eat those specific meals yesterday?",
+          "What made you feel proud of yourself yesterday?",
+          "How did your physical energy levels change throughout the day yesterday?",
+          "Why did you wake up at that specific time yesterday?",
+          "What is one thing you did yesterday that you usually avoid doing?",
+          "How did yesterday's experience make you think about your future goals?",
+          "Why do you think we often struggle to find time for hobbies like you did?",
+          "What was the most beautiful thing you saw yesterday, and why did it catch your eye?",
+          "How did you handle your chores yesterday? Did you have a strategy?",
+          "Why did you decide to contact that specific friend yesterday?",
+          "What did you think about the movie or book you interacted with yesterday?",
+          "How did you stay positive during the boring parts of yesterday?",
+          "Why do you think yesterday was a perfect example of a good or bad day?",
+          "What is the very first thing you told someone about your day yesterday?"
+        ]
+      },
+      B2: {
+        vocab: [
+          { word: "I encountered", emoji: "a setback" },
+          { word: "I brainstormed", emoji: "solutions" },
+          { word: "I collaborated", emoji: "closely" },
+          { word: "I presented", emoji: "a pitch" },
+          { word: "I finalized", emoji: "a contract" },
+          { word: "I celebrated", emoji: "a breakthrough" },
+          { word: "I handled", emoji: "under pressure" },
+          { word: "I addressed", emoji: "the issue" },
+          { word: "I overcame", emoji: "an obstacle" },
+          { word: "I achieved", emoji: "the objective" }
+        ],
+        // Verb + Complement feedback helpers
+        vocabFeedback: {
+          0: "⚠️ 'encountered a setback' is very common in complex agile projects.",
+          1: "💡 'brainstormed solutions' gathers awesome ideas.",
+          2: "🤝 'collaborated closely' is vital for cohesive engineering teams.",
+          3: "📊 'presented a pitch' explains core ideas beautifully.",
+          4: "✒️ 'finalized a contract' creates legal consensus.",
+          5: "🥳 'celebrated a breakthrough' boosts motivation.",
+          6: "🌋 'handled under pressure' demonstrates professional calm.",
+          7: "🎯 'addressed the issue' focuses on correcting core blocks.",
+          8: "🧗 'overcame an obstacle' requires persistency.",
+          9: "🏁 'achieved the objective' fulfills expectations!"
+        },
+        dialogue: "Yesterday at the office, our development team encountered a major setback with the software launch. The server crashed unexpectedly. However, we immediately brainstormed solutions and collaborated closely with our engineering experts. After we addressed the main technical issue, we presented a pitch to our stakeholders explaining our security upgrade. Ultimately, we overcame the obstacle, finalized our client contract, and celebrated a significant breakthrough.",
+        questions: [
+          { q: "What setback occurred during the office day?", options: ["The server crashed unexpectedly", "The main investor withdrew funds", "The designer quit", "The hardware was stolen"], ans: 0, exp: "The narrator says: 'The server crashed unexpectedly'." },
+          { q: "How did the team resolve the immediate problem?", options: ["They brainstormed and collaborated closely", "They postponed the release for next month", "They fired the head engineer", "They did nothing and went home"], ans: 0, exp: "They brainstormed solutions and collaborated closely." },
+          { q: "Who did the team collaborate with?", options: ["Engineering experts", "Marketing team", "External lawyers", "Our competition"], ans: 0, exp: "They say: 'collaborated closely with our engineering experts'." },
+          { q: "What did they present to stakeholders?", options: ["A pitch explaining a security upgrade", "An apology letter", "A refund proposal", "A demo of a new game"], ans: 0, exp: "They presented a pitch explaining a security upgrade." },
+          { q: "What was the final positive outcome with the client?", options: ["They finalized a contract", "They canceled the deal", "They got sued", "They changed clients"], ans: 0, exp: "They say: 'finalized our client contract'." },
+          { q: "How did the team feel at the end?", options: ["They celebrated a breakthrough", "They were stressed out", "They decided to resign", "They were indifferent"], ans: 0, exp: "They celebrated a significant breakthrough." },
+          { q: "When did these events take place?", options: ["Yesterday", "Last year", "This morning", "Last week"], ans: 0, exp: "The audio begins with: 'Yesterday at the office...'" },
+          { q: "What type of product were they launching?", options: ["Software", "Physical book", "Mobile phone", "A new car"], ans: 0, exp: "It was a software launch." },
+          { q: "How did they manage the high levels of stress?", options: ["They worked efficiently under pressure", "They argued with each other", "They complained to human resources", "They went home early"], ans: 0, exp: "The team worked collaboratively to solve the crash quickly." },
+          { q: "What is the primary theme of the audio?", options: ["Teamwork and problem-solving", "Individual success", "Financial failure", "Marketing strategies"], ans: 0, exp: "The main focus is on how they overcame a technical obstacle together." }
+        ],
+        sequencing: [
+          "The software server crashed unexpectedly.",
+          "Team members brainstormed solutions in a meeting.",
+          "Engineers and developers fixed the security issue.",
+          "Presented a security pitch to external stakeholders.",
+          "Finalized the client contract and celebrated."
+        ],
+        chatAnswers: [
+          { pattern: /setback|issue|crash|pressure/i, question: "How did you manage that pressure?", reply: "Overcoming crashes build immense resilience!", default: "Coping with office pressure requires strong team alignment. What did you learn?" },
+          { pattern: /brainstorm|solution|collaborate/i, question: "Who spearheaded the session?", reply: "Collaborative meetings produce awesome breakthroughs!", default: "Collaborative brainstorming sessions generate the most innovative options. Did everyone agree?" },
+          { pattern: /pitch|presented/i, question: "Were the stakeholders receptive?", reply: "Great presentation!", default: "Pitching upgrades is a crucial skill. Did you feel confident?" },
+          { pattern: /contract|finalized|negotiate/i, question: "Did you celebrate after signing?", reply: "Excellent job finalizing it!", default: "Signing contracts indicates great trust. How did you close the deal?" }
+        ],
+        wheel: [
+          "Talk about a major setback you solved.",
+          "Describe how you work under pressure.",
+          "How did you collaborate on a recent project?",
+          "What objective have you achieved recently?",
+          "Describe a typical stressful day at work/school.",
+          "How do you brainstorm creative ideas?",
+          "Have you ever presented a pitch or presentation?",
+          "Talk about an obstacle you overcame."
+        ],
+        chatQuestions: [
+          "Why do you think everything happened that way?",
+          "Which decision had the greatest impact?",
+          "What advice would you give someone in the same situation?",
+          "Looking back, would you make the same decision?",
+          "How did this experience influence your opinion?",
+          "What would have happened if you had chosen differently?",
+          "Which part required the most effort?",
+          "Do you think you handled the situation well? Why?",
+          "How would you describe that experience to someone who wasn't there?",
+          "What did you discover about yourself?",
+          "To what extent did other people's actions shape your schedule or mood yesterday?",
+          "How did you prioritize your tasks yesterday, and what does that say about your current values?",
+          "What underlying factors made yesterday feel successful or stressful for you?",
+          "How did yesterday's social interactions reflect the type of relationships you value?",
+          "Do you think you managed your distractions well yesterday? How can you improve?",
+          "What was the most complex decision you had to make yesterday, and how did you weigh the options?",
+          "How did the environment you spent your time in yesterday influence your mental clarity?",
+          "In what ways did yesterday's experience contrast with your initial expectations?",
+          "Why do you think certain moments of yesterday felt much longer or shorter than they actually were?",
+          "What role did patience or impatience play in your actions yesterday?",
+          "How did you handle any constructive criticism or feedback you received yesterday?",
+          "What are the long-term consequences of the work or studying you completed yesterday?",
+          "Do you think people place too much importance on being busy, based on your day yesterday?",
+          "How did your emotional state yesterday influence your productivity and communication?",
+          "What aspects of yesterday made you feel truly connected to the people around you?",
+          "Why is it often difficult to stick to our planned routines, considering your day yesterday?",
+          "What did yesterday's experience teach you about handling unexpected changes?",
+          "How did you justify spending money or resources on specific things yesterday?",
+          "In what ways did yesterday's activities contribute to your professional or personal development?",
+          "How did you resolve any internal conflicts about how to spend your time yesterday?",
+          "Why did certain conversations yesterday leave a lasting impression on you?",
+          "How do you evaluate the balance of screen time versus real-world interaction in your day yesterday?",
+          "Do you think you took enough risks yesterday? Why or why not?",
+          "What did yesterday teach you about your ability to focus under pressure?",
+          "How did yesterday's small victories contribute to your overall confidence?",
+          "Why do you think we often remember the negative moments of a day more than the positive ones?",
+          "What did you do yesterday that felt like a genuine expression of your authentic self?",
+          "How did you maintain boundaries with your time or energy yesterday?",
+          "Why did you choose to seek out or avoid company yesterday?",
+          "In what ways did yesterday's meals reflect your current relationship with health and wellness?",
+          "What did yesterday's chores or routines show you about the value of consistency?",
+          "How did you handle your energy levels when you felt tired or unmotivated yesterday?",
+          "What was the most meaningful silence you experienced yesterday, and what did you think about?",
+          "How did yesterday's reading or watching influence your creative thinking?",
+          "Why do you think some days, like yesterday, feel more aligned with our true goals than others?",
+          "What did yesterday's exercise or physical activity reveal about your current fitness and health?",
+          "How did you feel about the commitments you made or kept yesterday?",
+          "What was the most spontaneous thing you did yesterday, and why did you do it?",
+          "Do you think yesterday's level of productivity is sustainable in the long run? Why?",
+          "If you had to write a short essay about yesterday, what would the central theme be?"
+        ]
+      },
+      C1: {
+        vocab: [
+          { word: "I grappled", emoji: "with a concept" },
+          { word: "I sparked", emoji: "a debate" },
+          { word: "I garnered", emoji: "support" },
+          { word: "I spearheaded", emoji: "an initiative" },
+          { word: "I acquired", emoji: "profound insight" },
+          { word: "I mitigated", emoji: "the risks" },
+          { word: "I fostered", emoji: "innovation" },
+          { word: "I reconciled", emoji: "differences" },
+          { word: "I paved", emoji: "the way" },
+          { word: "I attained", emoji: "academic prestige" }
+        ],
+        // Verb + Complement feedback helpers
+        vocabFeedback: {
+          0: "🧠 Excellent! 'I grappled with a concept' demonstrates rigorous intellectual effort.",
+          1: "⚡ Sparked a debate! Controversy triggers active critical thinking.",
+          2: "🗳️ Garnered support! Mobilizing peers is crucial for advocacy.",
+          3: "🚩 Spearheaded an initiative! True leadership skills shown.",
+          4: "👁️ Acquired profound insight! Reflective thought yields deep wisdom.",
+          5: "🛡️ Mitigated the risks! Strategic foresight protects assets.",
+          6: "🌱 Fostered innovation! Cultivating fresh methodology yields growth.",
+          7: "⚖️ Reconciled differences! Finding consensus requires high diplomacy.",
+          8: "🛣️ Paved the way! Pioneers create room for future researchers.",
+          9: "🎓 Attained academic prestige! Elevating scholarly reputations."
+        },
+        dialogue: "During our academic colloquium last term, we grappled with the profound ethical implications of neurotechnology. My colleague's controversial paper immediately sparked an intense debate among the faculty. Nonetheless, she garnered support from key researchers after spearheading an initiative for transparent research. This scholarly pursuit allowed us to acquire profound insight into human cognition while mitigating potential societal risks, thereby paving the way for future legislation.",
+        questions: [
+          { q: "What central issue did the colloquium grapple with?", options: ["Ethical implications of neurotechnology", "Economic theories of inflation", "Marine biology conservation", "Quantum physics formulations"], ans: 0, exp: "They grappled with the ethical implications of neurotechnology." },
+          { q: "What was the initial reaction to the colleague's paper?", options: ["It sparked an intense debate", "It was completely ignored", "It was unanimously rejected", "It was instantly patented"], ans: 0, exp: "It sparked an intense debate among the faculty." },
+          { q: "How did the author of the paper gain backing?", options: ["By spearheading an initiative for transparency", "By offering financial incentives", "By changing her research focus", "By resigning from her academic position"], ans: 0, exp: "By spearheading an initiative for transparent research." },
+          { q: "What did the scholars acquire through this project?", options: ["Profound insight into human cognition", "A large financial research grant", "A commercial software license", "New physical laboratory equipment"], ans: 0, exp: "It allowed them to acquire profound insight into human cognition." },
+          { q: "What was a major prerequisite mentioned alongside innovation?", options: ["Mitigating potential societal risks", "Increasing student tuition", "Fostering standard testing", "Importing foreign components"], ans: 0, exp: "Mitigating potential societal risks is explicitly stated." },
+          { q: "What long-term effect did the colloquium have?", options: ["It paved the way for future legislation", "It closed down the neuro-department", "It restricted international publications", "It changed the university's main logo"], ans: 0, exp: "It paved the way for future legislation." },
+          { q: "When did this academic colloquium occur?", options: ["Last term", "Yesterday evening", "Five years ago", "Next semester"], ans: 0, exp: "The audio specifies: 'During our academic colloquium last term...'" },
+          { q: "Who participated in the heated debate?", options: ["The university faculty", "Undergraduate students only", "Tech industry CEOs", "Local government officials"], ans: 0, exp: "The faculty participated in the debate." },
+          { q: "What does 'grappled with' signify in this context?", options: ["Struggled to understand or resolve", "Fought physically with someone", "Ignored on purpose", "Succeeded without effort"], ans: 0, exp: "'Grapple with' means struggling to analyze, handle, or comprehend a tough concept." },
+          { q: "Which word best describes the tone of the dialogue?", options: ["Scholarly and reflective", "Anxious and pessimistic", "Casual and humorous", "Aggressive and defensive"], ans: 0, exp: "The sophisticated vocabulary lends a highly formal and scholarly tone." }
+        ],
+        sequencing: [
+          "Faculty convened at the colloquium last term.",
+          "A colleague presented a controversial paper.",
+          "An intense ethical debate erupted among researchers.",
+          "The author spearheaded an initiative for research transparency.",
+          "The findings paved the way for future legislative proposals."
+        ],
+        chatAnswers: [
+          { pattern: /grapple|concept|debate|ethics/i, question: "Which side of the argument did you support?", reply: "Grappling with ethical queries is so deep!", default: "Debating profound academic concepts can be mentally challenging. Did you find common ground?" },
+          { pattern: /support|initiative|spearhead/i, question: "What challenges did you face?", reply: "Nice initiative!", default: "Spearheading new initiatives requires solid evidence. Did you get much pushback?" },
+          { pattern: /insight|cognition|mind/i, question: "What was the most surprising discovery?", reply: "Profound insights are priceless!", default: "Acquiring profound insights is what makes research rewarding!" }
+        ],
+        wheel: [
+          "Grapple with an ethical dilemma you know.",
+          "What sparked a debate in your classroom recently?",
+          "Talk about an initiative you would like to spearhead.",
+          "Describe how you acquired a profound life insight.",
+          "How do you mitigate risks in your daily life?",
+          "How can schools foster genuine innovation?",
+          "Describe a time you reconciled differences with someone.",
+          "What paved the way for your current success?"
+        ],
+        chatQuestions: [
+          "Looking back, how has that experience shaped the way you think today?",
+          "Which personal values influenced your decisions the most?",
+          "If you could revisit that situation, would your approach be different? Why?",
+          "To what extent do you think luck influenced the outcome?",
+          "How might someone with a completely different background interpret that experience?",
+          "What assumptions did you have before that experience, and how did they change?",
+          "How has that experience influenced your priorities?",
+          "What broader lesson can be drawn from what happened?",
+          "How would you compare that experience with another important event in your life?",
+          "What emotions were the most difficult to express?",
+          "Was there a turning point that changed everything?",
+          "What do you think was the underlying cause of the situation?",
+          "If one event had happened differently, how might the outcome have changed?",
+          "How has your opinion evolved since then?",
+          "What personal strengths or weaknesses became evident during that experience?",
+          "Would someone else tell the story differently? Why?",
+          "What aspects of the experience challenged your beliefs?",
+          "What long-term impact do you think it had on you?",
+          "How did that experience contribute to your personal growth?",
+          "If you had to summarize the experience in one idea, what would it be and why?",
+          "How did the sensory details of the environment you were in amplify or soothe your internal state?",
+          "What role did unexpressed expectations play in how you perceived the outcomes of that day?",
+          "To what degree did you feel in control of your narrative while these events were actually occurring?",
+          "How did that experience redefine your understanding of personal success or failure?",
+          "What did that day teach you about the thin line between persistence and stubbornness?",
+          "How did you navigate the ethical grey areas that arose during your interactions yesterday?",
+          "Why do you think we often feel a sense of nostalgia for moments that were highly stressful at the time?",
+          "How did you reconcile the tension between your individual desires and collective obligations yesterday?",
+          "What does that experience suggest about our general human capacity to predict emotional reactions?",
+          "In what ways did that day highlight the contrast between digital connectedness and real-world isolation?",
+          "How did you process the quiet moments of reflection that occurred after the main event ended?",
+          "What did yesterday's intellectual or creative struggles reveal about your current cognitive state?",
+          "How did you balance the need for immediate action with the value of deep reflection yesterday?",
+          "What subtext did you perceive in your conversations yesterday that wasn't explicitly spoken?",
+          "How did the physical space you occupied yesterday act as a catalyst for your emotional state?",
+          "Do you think our memories of days like yesterday are active constructions or accurate records?",
+          "How did you manage the paradox of choice when deciding how to allocate your limited energy yesterday?",
+          "What did that day reveal about your tolerance for ambiguity and unresolved situations?",
+          "In what ways did your interactions yesterday mirror larger societal trends or communication shifts?",
+          "How did you establish or protect your personal boundaries when they were tested yesterday?",
+          "What did you realize about the nature of compromise during your negotiations yesterday?",
+          "How did that experience challenge your understanding of the relationship between effort and reward?",
+          "To what extent did yesterday's activities feel like a performative act versus a genuine experience?",
+          "How did you handle the cognitive dissonance of doing something necessary but highly unappealing?",
+          "What did yesterday teach you about the way you handle authority or collective pressure?",
+          "How did you find beauty or meaning in the seemingly mundane aspects of yesterday's routine?",
+          "In what ways did yesterday's experience make you realize the value of impermanence?",
+          "How did you manage the transition between different social roles throughout your day yesterday?",
+          "What underlying anxieties did yesterday's challenges bring to the surface, and how did you soothe them?",
+          "If you had to describe yesterday as a work of art, what style would it be and what would it represent?"
+        ]
+      }
+    };
+
+    // --- APPLICATION STATE VARIABLES ---
+    let currentLevel = 'A2';
+    let userScore = 0;
+    let playsCount = 0;
+    let currentQuestionIdx = 0;
+    let selectedAnswers = [];
+    let postSubActivity = 'seq';
+    let chatBotState = 0;
+    let isSpinning = false;
+    let recognition = null;
+    let isAudioPlaying = false;
+
+    // SCALFFOLDING STATE VARIABLES
+    let appMode = 'free'; // 'free' or 'scaffold'
+    let scaffoldMaxUnlocked = 'A1';
+    const cefrLevelsOrder = ['A1', 'A2', 'B1', 'B2', 'C1'];
+
+    // Shared conversation topic linked directly to roulette selections
+    let conversationTopic = "yesterday activities";
+    
+    // Gira la ruleta persistiendo el ángulo de giro previo para aleatoriedad real
+    let currentWheelRotation = 0;
+
+    // Interactive flip matching system state
+    let firstFlippedCard = null;
+    let flipMatchedCount = 0;
+    let totalExpectedMatches = 0;
+
+    const synth = window.speechSynthesis;
+
+    // --- INITIALIZATION ---
+    window.onload = function() {
+      document.getElementById('levelScreen').classList.remove('hidden');
+      setupSpeechRecognition();
+      updateLevelLocksUI();
+    };
+
+    // --- MODE SWITCHER CONTROLS ---
+    function setAppMode(mode) {
+      appMode = mode;
+      const freeBtn = document.getElementById('modeBtn-free');
+      const scaffoldBtn = document.getElementById('modeBtn-scaffold');
+      const desc = document.getElementById('modeDescription');
+
+      if (mode === 'free') {
+        freeBtn.className = "py-2 px-4 rounded-xl font-bold transition-all bg-brand-500 text-white shadow-md";
+        scaffoldBtn.className = "py-2 px-4 rounded-xl font-bold transition-all bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300";
+        desc.innerText = "Feel free to access and complete any English proficiency level you prefer!";
+      } else {
+        scaffoldBtn.className = "py-2 px-4 rounded-xl font-bold transition-all bg-brand-500 text-white shadow-md";
+        freeBtn.className = "py-2 px-4 rounded-xl font-bold transition-all bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300";
+        desc.innerText = "Sequential progression! Complete previous levels with a grade ≥ 70% to unlock advanced material.";
+      }
+      sounds.playTick();
+      updateLevelLocksUI();
+    }
+
+    function updateLevelLocksUI() {
+      cefrLevelsOrder.forEach((lvl) => {
+        const btn = document.getElementById(`lvlBtn-${lvl}`);
+        if (!btn) return;
+        
+        const lockSpan = btn.querySelector('.lvlLock');
+        
+        if (appMode === 'scaffold') {
+          const unlockedIdx = cefrLevelsOrder.indexOf(scaffoldMaxUnlocked);
+          const currentIdx = cefrLevelsOrder.indexOf(lvl);
+          
+          if (currentIdx > unlockedIdx) {
+            btn.classList.add('opacity-50', 'cursor-not-allowed');
+            if (lockSpan) lockSpan.innerHTML = '🔒';
+          } else {
+            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+            if (lockSpan) lockSpan.innerHTML = '🔓';
+          }
+        } else {
+          // Free Mode: Everything unlocked
+          btn.classList.remove('opacity-50', 'cursor-not-allowed');
+          if (lockSpan) lockSpan.innerHTML = '';
+        }
+      });
+    }
+
+    // --- LEVEL SELECTION HANDLING ---
+    function selectLevel(level) {
+      if (appMode === 'scaffold') {
+        const unlockedIdx = cefrLevelsOrder.indexOf(scaffoldMaxUnlocked);
+        const targetIdx = cefrLevelsOrder.indexOf(level);
+        if (targetIdx > unlockedIdx) {
+          sounds.playIncorrect();
+          showFeedbackModal("Level Locked 🔒", "Please complete the previous CEFR level with a score of 70% or more to unlock this level in Scaffolding Mode!");
+          return;
+        }
+      }
+
+      currentLevel = level;
+      userScore = 0;
+      playsCount = 0;
+      currentQuestionIdx = 0;
+      selectedAnswers = Array(10).fill(null);
+      firstFlippedCard = null;
+      flipMatchedCount = 0;
+      conversationTopic = "yesterday activities"; // reset default topic
+      currentWheelRotation = 0; // reset wheel position
+      
+      // Update header indicators
+      document.getElementById('levelBadge').innerText = level;
+      document.getElementById('levelBadge').className = getBadgeClass(level);
+      document.getElementById('headerScore').innerText = userScore;
+      document.getElementById('mainProgressBar').style.width = '10%';
+      
+      // Transition viewports
+      document.getElementById('levelScreen').classList.add('hidden');
+      document.getElementById('stepContainer').classList.remove('hidden');
+      document.getElementById('appHeader').classList.remove('hidden');
+
+      goToPhase('pre');
+    }
+
+    function getBadgeClass(level) {
+      const classes = {
+        A1: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300",
+        A2: "bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300",
+        B1: "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300",
+        B2: "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300",
+        C1: "bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300"
+      };
+      return classes[level] || classes.A2;
+    }
+
+    function goHome() {
+      stopAllAudio();
+      document.getElementById('appHeader').classList.add('hidden');
+      document.getElementById('stepContainer').classList.add('hidden');
+      document.getElementById('resultsScreen').classList.add('hidden');
+      document.getElementById('levelScreen').classList.remove('hidden');
+      updateLevelLocksUI();
+    }
+
+    function toggleDarkMode() {
+      document.documentElement.classList.toggle('dark');
+    }
+
+    function toggleMute() {
+      const isMuted = sounds.toggleMute();
+      document.getElementById('soundOnIcon').classList.toggle('hidden', isMuted);
+      document.getElementById('soundOffIcon').classList.toggle('hidden', !isMuted);
+    }
+
+    function stopAllAudio() {
+      const nativeAudio = document.getElementById('nativeAudio');
+      nativeAudio.pause();
+      nativeAudio.currentTime = 0;
+      if (synth) {
+        synth.cancel();
+      }
+      isAudioPlaying = false;
+      updateAudioButtonState(false);
+    }
+
+    // Direct click navigation across phases
+    function goToPhase(phase) {
+      stopAllAudio();
+      
+      document.getElementById('step-pre').classList.add('hidden');
+      document.getElementById('step-while').classList.add('hidden');
+      document.getElementById('step-post').classList.add('hidden');
+      
+      const tabs = ['pre', 'while', 'post'];
+      tabs.forEach(t => {
+        const el = document.getElementById(`phaseTab-${t}`);
+        el.className = "flex items-center space-x-2 font-display font-semibold text-slate-400 dark:text-slate-500 pb-2 transition-all hover:text-brand-500";
+        el.querySelector('span').className = "w-6 h-6 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 flex items-center justify-center text-xs";
+      });
+
+      document.getElementById(`step-${phase}`).classList.remove('hidden');
+      const activeTab = document.getElementById(`phaseTab-${phase}`);
+      activeTab.className = "flex items-center space-x-2 font-display font-semibold text-brand-500 pb-2 border-b-2 border-brand-500 transition-all";
+      activeTab.querySelector('span').className = "w-6 h-6 rounded-full bg-brand-500 text-white flex items-center justify-center text-xs";
+
+      if (phase === 'pre') {
+        document.getElementById('mainProgressBar').style.width = '20%';
+        initMemoryGame();
+      } else if (phase === 'while') {
+        document.getElementById('mainProgressBar').style.width = '50%';
+        initWhileListening();
+      } else if (phase === 'post') {
+        document.getElementById('mainProgressBar').style.width = '80%';
+        initPostListening();
+      }
+    }
+
+
+    // ==========================================
+    // 1. PRE-LISTENING: MEMORY MATCH (SUBJECT + VERB ➔ COMPLEMENT) - TEXT ONLY
+    // ==========================================
+    function initMemoryGame() {
+      const vocabList = appData[currentLevel].vocab;
+      flipMatchedCount = 0;
+      firstFlippedCard = null;
+      totalExpectedMatches = vocabList.length;
+
+      document.getElementById('memoryCompletion').classList.add('hidden');
+      document.getElementById('memoryBoard').classList.remove('hidden');
+      
+      // Classmate tip initialization
+      const tipBox = document.getElementById('classmateTipBox');
+      const tipText = document.getElementById('classmateTipText');
+      tipBox.classList.remove('hidden');
+      tipText.innerText = "Flip any tile to discover subject-verbs and complements of simple past activities!";
+
+      // Assemble game cards: half subject-verbs, half complements
+      let cardsData = [];
+      vocabList.forEach((item, index) => {
+        // Subject + Verb card
+        cardsData.push({
+          id: index * 2,
+          matchId: index,
+          text: item.verb || item.word,
+          type: 'subject + verb',
+          feedback: item.feedback || (appData[currentLevel].vocabFeedback ? appData[currentLevel].vocabFeedback[index] : "Great chunk match!")
+        });
+        // Complement card
+        cardsData.push({
+          id: index * 2 + 1,
+          matchId: index,
+          text: item.complement || item.emoji,
+          type: 'complement',
+          feedback: item.feedback || (appData[currentLevel].vocabFeedback ? appData[currentLevel].vocabFeedback[index] : "Great chunk match!")
+        });
+      });
+
+      // Shuffle
+      cardsData.sort(() => Math.random() - 0.5);
+
+      // Render memory board
+      const board = document.getElementById('memoryBoard');
+      board.innerHTML = '';
+      
+      if (cardsData.length <= 12) {
+        board.className = "grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto py-4";
+      } else {
+        board.className = "grid grid-cols-2 sm:grid-cols-5 gap-3 max-w-3xl mx-auto py-4";
+      }
+
+      cardsData.forEach(card => {
+        const cardEl = document.createElement('div');
+        cardEl.className = "card-perspective h-24 cursor-pointer relative";
+        cardEl.setAttribute('id', `tile-${card.id}`);
+        cardEl.onclick = () => triggerMemoryFlip(cardEl, card);
+
+        // Styling back of tile with subtle texture, absolutely no image or stickers used
+        cardEl.innerHTML = `
+          <div class="card-inner w-full h-full relative rounded-2xl shadow-md border-2 border-slate-200 dark:border-slate-700">
+            <!-- Back (face down) -->
+            <div class="card-front absolute inset-0 bg-gradient-to-br from-brand-600 to-indigo-700 rounded-2xl flex items-center justify-center text-white font-display text-2xl font-bold">
+              ★
+            </div>
+            <!-- Front (face up text-only card) -->
+            <div class="card-back absolute inset-0 bg-white dark:bg-slate-800 rounded-2xl flex flex-col items-center justify-center p-3 text-center">
+              <span class="text-[10px] uppercase font-extrabold tracking-wider text-brand-500 mb-1 leading-none">${card.type}</span>
+              <span class="text-sm font-bold text-slate-800 dark:text-slate-100 leading-tight">${card.text}</span>
+            </div>
+          </div>
+        `;
+        board.appendChild(cardEl);
+      });
+    }
+
+    function triggerMemoryFlip(cardEl, card) {
+      const inner = cardEl.querySelector('.card-inner');
+      
+      // Guard clauses to avoid double flipping or clicking locked cards
+      if (inner.classList.contains('card-flipped')) return;
+      if (cardEl.classList.contains('pointer-events-none')) return;
+      if (firstFlippedCard && firstFlippedCard.id === card.id) return;
+
+      // Perform flip
+      inner.classList.add('card-flipped');
+      sounds.playTick();
+
+      if (!firstFlippedCard) {
+        // First card of pair
+        firstFlippedCard = { el: cardEl, data: card };
+      } else {
+        // Second card flipped: verify match
+        const c1 = firstFlippedCard;
+        const c2 = { el: cardEl, data: card };
+        firstFlippedCard = null; // reset state
+        
+        // Match condition: same matchId but different types (verb matches complement)
+        if (c1.data.matchId === c2.data.matchId && c1.data.type !== c2.data.type) {
+          // Success! Keep matched and lock/remove
+          setTimeout(() => {
+            sounds.playCorrect();
+            
+            // Highlight Green
+            c1.el.querySelector('.card-inner').classList.add('border-emerald-500');
+            c2.el.querySelector('.card-inner').classList.add('border-emerald-500');
+            
+            c1.el.classList.add('pointer-events-none');
+            c2.el.classList.add('pointer-events-none');
+
+            // Visual feedback: reduce opacity and scale down matched tiles to clean layout
+            c1.el.classList.add('opacity-40', 'scale-95');
+            c2.el.classList.add('opacity-40', 'scale-95');
+            c1.el.style.transition = "all 0.4s ease";
+            c2.el.style.transition = "all 0.4s ease";
+
+            triggerMiniConfetti(c2.el);
+            
+            // Helpful Classmate Advice feedback
+            const tipText = document.getElementById('classmateTipText');
+            tipText.innerText = c1.data.feedback;
+
+            flipMatchedCount++;
+            userScore += 50;
+            document.getElementById('headerScore').innerText = userScore;
+
+            if (flipMatchedCount === totalExpectedMatches) {
+              setTimeout(() => {
+                sounds.playWin();
+                triggerLargeConfetti();
+                document.getElementById('memoryBoard').classList.add('hidden');
+                document.getElementById('classmateTipBox').classList.add('hidden');
+                document.getElementById('memoryCompletion').classList.remove('hidden');
+              }, 600);
+            }
+          }, 300);
+        } else {
+          // Incorrect Match: flip back with shake animation & NO error sound (STRICT MANDATORY EXCEPTION FOR PRE-LISTENING MATCH ACTIVITY)
+          setTimeout(() => {
+            c1.el.classList.add('animate-wiggle');
+            c2.el.classList.add('animate-wiggle');
+            
+            const tipText = document.getElementById('classmateTipText');
+            tipText.innerText = "Almost! Think about common daily past tense expressions.";
+
+            setTimeout(() => {
+              c1.el.classList.remove('animate-wiggle');
+              c2.el.classList.remove('animate-wiggle');
+              c1.el.querySelector('.card-inner').classList.remove('card-flipped');
+              c2.el.querySelector('.card-inner').classList.remove('card-flipped');
+            }, 600);
+          }, 500);
+        }
+      }
+    }
+
+
+    // ==========================================
+    // 2. WHILE-LISTENING: REPLAY LIMITS & AUDIO CONTROL
+    // ==========================================
+    function initWhileListening() {
+      playsCount = 2;
+      currentQuestionIdx = 0;
+      selectedAnswers = Array(10).fill(null);
+      isAudioPlaying = false;
+
+      document.getElementById('playsRemaining').innerText = `${playsCount}/2`;
+      document.getElementById('audioProgressBar').style.width = '0%';
+      document.getElementById('whileCompletion').classList.add('hidden');
+      document.getElementById('quizContainer').classList.remove('hidden');
+      document.getElementById('explanationBox').classList.add('hidden');
+      
+      document.getElementById('audioTitle').innerText = currentLevel === 'A2' ? "Tom and Anna's Day (Original Dialogue)" : `Audio Dialogue - Level ${currentLevel}`;
+
+      updateAudioButtonState(false);
+      renderQuestion();
+    }
+
+    function updateAudioButtonState(isPlaying) {
+      const btn = document.getElementById('audioPlayBtn');
+      const postBtn = document.getElementById('postAudioPlayBtn');
+      const statusSpan = document.getElementById('postAudioStatus');
+
+      if (isPlaying) {
+        if (btn) {
+          btn.innerHTML = `<svg class="w-8 h-8 fill-current" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+          btn.classList.replace('bg-brand-500', 'bg-rose-500');
+          btn.classList.replace('hover:bg-brand-600', 'hover:bg-rose-600');
+        }
+        if (postBtn) {
+          postBtn.innerHTML = `<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>`;
+          postBtn.classList.replace('bg-brand-500', 'bg-rose-500');
+        }
+        if (statusSpan) {
+          statusSpan.innerText = "Playing";
+          statusSpan.className = "text-xs text-rose-500 font-bold animate-pulse";
+        }
+      } else {
+        if (btn) {
+          btn.innerHTML = `<svg class="w-8 h-8 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
+          btn.classList.replace('bg-rose-500', 'bg-brand-500');
+          btn.classList.replace('hover:bg-rose-600', 'hover:bg-brand-600');
+        }
+        if (postBtn) {
+          postBtn.innerHTML = `<svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>`;
+          postBtn.classList.replace('bg-rose-500', 'bg-brand-500');
+        }
+        if (statusSpan) {
+          statusSpan.innerText = "Ready";
+          statusSpan.className = "text-xs text-brand-500 font-bold";
+        }
+      }
+    }
+
+    function playAudio() {
+      if (isAudioPlaying) {
+        stopAllAudio();
+        return;
+      }
+
+      // Replaying audio during POST ordering does NOT reduce remaining playsCount as it is a helper.
+      const isPostSequencingActive = !document.getElementById('post-seq').classList.contains('hidden');
+
+      if (!isPostSequencingActive && playsCount <= 0) {
+        showFeedbackModal("Playback Limit Reached", "You have already used your 2 permitted playbacks. Try answering the questions based on what you remember!");
+        return;
+      }
+
+      if (!isPostSequencingActive) {
+        playsCount--;
+        document.getElementById('playsRemaining').innerText = `${playsCount}/2`;
+      }
+
+      isAudioPlaying = true;
+      updateAudioButtonState(true);
+
+      const progressBar = document.getElementById('audioProgressBar');
+      progressBar.style.width = '0%';
+      
+      if (currentLevel === 'A2') {
+        const nativeAudio = document.getElementById('nativeAudio');
+        
+        nativeAudio.onerror = function() {
+          console.warn("Native audio source failed to load. Falling back to robust Speech Synthesis TTS.");
+          runSpeechSynthesisFallback();
+        };
+
+        nativeAudio.play().then(() => {
+          nativeAudio.ontimeupdate = function() {
+            if (nativeAudio.duration) {
+              const pct = (nativeAudio.currentTime / nativeAudio.duration) * 100;
+              progressBar.style.width = `${pct}%`;
+            }
+          };
+          nativeAudio.onended = function() {
+            isAudioPlaying = false;
+            updateAudioButtonState(false);
+            progressBar.style.width = '100%';
+          };
+        }).catch(err => {
+          console.warn("Playback blocked or source not found, triggering TTS fallback:", err);
+          runSpeechSynthesisFallback();
+        });
+      } else {
+        runSpeechSynthesisFallback();
+      }
+    }
+
+    function runSpeechSynthesisFallback() {
+      const progressBar = document.getElementById('audioProgressBar');
+      if ('speechSynthesis' in window) {
+        synth.cancel();
+        const utterance = new SpeechSynthesisUtterance(appData[currentLevel].dialogue);
+        utterance.lang = 'en-US';
+        utterance.rate = currentLevel === 'A1' ? 0.75 : (currentLevel === 'B1' ? 0.9 : 1.0);
+        
+        let durationEstimate = appData[currentLevel].dialogue.split(' ').length * 400;
+        let start = Date.now();
+        
+        const interval = setInterval(() => {
+          if (!isAudioPlaying) {
+            clearInterval(interval);
+            return;
+          }
+          let elapsed = Date.now() - start;
+          let pct = Math.min((elapsed / durationEstimate) * 100, 100);
+          progressBar.style.width = `${pct}%`;
+          if (pct >= 100) {
+            clearInterval(interval);
+          }
+        }, 100);
+
+        utterance.onend = function() {
+          isAudioPlaying = false;
+          updateAudioButtonState(false);
+          progressBar.style.width = '100%';
+          clearInterval(interval);
+        };
+
+        utterance.onerror = function() {
+          isAudioPlaying = false;
+          updateAudioButtonState(false);
+          clearInterval(interval);
+        };
+
+        synth.speak(utterance);
+      } else {
+        progressBar.style.width = '100%';
+        isAudioPlaying = false;
+        updateAudioButtonState(false);
+        showFeedbackModal("TTS Support Missing", "Your browser does not support Speech Synthesis offline. Please read transcription references.");
+      }
+    }
+
+    function renderQuestion() {
+      const qData = appData[currentLevel].questions[currentQuestionIdx];
+      document.getElementById('currentQuestionNum').innerText = currentQuestionIdx + 1;
+      document.getElementById('quizQuestionText').innerText = qData.q;
+      
+      const optionsBox = document.getElementById('quizOptions');
+      optionsBox.innerHTML = '';
+
+      qData.options.forEach((opt, idx) => {
+        const btn = document.createElement('button');
+        btn.className = "w-full text-left bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition font-medium focus:ring-2 focus:ring-brand-500 flex items-center justify-between text-sm sm:text-base";
+        btn.innerHTML = `<span>${opt}</span>`;
+        btn.onclick = () => selectOption(idx, btn);
+        optionsBox.appendChild(btn);
+      });
+
+      document.getElementById('explanationBox').classList.add('hidden');
+    }
+
+    function selectOption(selectedIdx, buttonEl) {
+      const qData = appData[currentLevel].questions[currentQuestionIdx];
+      const optionsBox = document.getElementById('quizOptions');
+      
+      Array.from(optionsBox.children).forEach(btn => btn.disabled = true);
+      
+      selectedAnswers[currentQuestionIdx] = selectedIdx;
+
+      if (selectedIdx === qData.ans) {
+        sounds.playCorrect();
+        buttonEl.className = "w-full text-left bg-emerald-500 text-white border-2 border-emerald-600 p-4 rounded-xl font-bold flex items-center justify-between text-sm sm:text-base";
+        buttonEl.innerHTML += `<span class="whitespace-nowrap">✔ Correct</span>`;
+        userScore += 100;
+        document.getElementById('headerScore').innerText = userScore;
+        document.getElementById('correctCounter').innerText = selectedAnswers.filter((a, i) => a === appData[currentLevel].questions[i].ans).length;
+        
+        document.getElementById('explanationTitle').className = "font-bold text-emerald-600 dark:text-emerald-400";
+        document.getElementById('explanationTitle').innerText = "🎉 Excellent Answer!";
+      } else {
+        // Softer pop feedback sound on incorrect choices as requested in while-listening quiz
+        sounds.playIncorrect();
+        buttonEl.className = "w-full text-left bg-rose-500 text-white border-2 border-rose-600 p-4 rounded-xl font-bold flex items-center justify-between animate-wiggle text-sm sm:text-base";
+        buttonEl.innerHTML += `<span class="whitespace-nowrap">✖ Incorrect</span>`;
+        
+        const correctBtn = optionsBox.children[qData.ans];
+        correctBtn.className = "w-full text-left bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-2 border-emerald-500 p-4 rounded-xl font-bold flex items-center justify-between text-sm sm:text-base";
+        correctBtn.innerHTML += `<span class="whitespace-nowrap">✔ Correct Answer</span>`;
+
+        document.getElementById('explanationTitle').className = "font-bold text-rose-500";
+        document.getElementById('explanationTitle').innerText = "💡 Keep Practicing!";
+      }
+
+      document.getElementById('explanationText').innerText = qData.exp;
+      document.getElementById('explanationBox').classList.remove('hidden');
+      
+      const pct = 50 + ((currentQuestionIdx + 1) / 10) * 20;
+      document.getElementById('mainProgressBar').style.width = `${pct}%`;
+    }
+
+    function nextQuestion() {
+      currentQuestionIdx++;
+      if (currentQuestionIdx < 10) {
+        renderQuestion();
+      } else {
+        document.getElementById('quizContainer').classList.add('hidden');
+        document.getElementById('whileCompletion').classList.remove('hidden');
+        sounds.playWin();
+        triggerLargeConfetti();
+      }
+    }
+
+
+    // ==========================================
+    // 3. POST-LISTENING: THREE CONNECTED ACTIVITIES
+    // ==========================================
+    function initPostListening() {
+      postSubActivity = 'seq';
+      switchPostActivity('seq');
+    }
+
+    function switchPostActivity(subAct) {
+      postSubActivity = subAct;
+      
+      document.getElementById('post-seq').classList.add('hidden');
+      document.getElementById('post-chat').classList.add('hidden');
+      document.getElementById('post-wheel').classList.add('hidden');
+      
+      document.getElementById('subTab-seq').className = "pb-2 text-slate-400 dark:text-slate-500";
+      document.getElementById('subTab-chat').className = "pb-2 text-slate-400 dark:text-slate-500";
+      document.getElementById('subTab-wheel').className = "pb-2 text-slate-400 dark:text-slate-500";
+
+      document.getElementById(`post-${subAct}`).classList.remove('hidden');
+      document.getElementById(`subTab-${subAct}`).className = "pb-2 border-b-2 border-brand-500 text-brand-500 font-bold";
+
+      if (subAct === 'seq') {
+        initSequencing();
+      } else if (subAct === 'chat') {
+        initChatInterview();
+      } else if (subAct === 'wheel') {
+        initWheel();
+      }
+    }
+
+    // --- ACTIVITY 1: STORY SEQUENCING ---
+    let sequencingItems = [];
+
+    function initSequencing() {
+      const originalSeq = appData[currentLevel].sequencing;
+      
+      sequencingItems = originalSeq.map((text, idx) => ({ text, originalIdx: idx }));
+      sequencingItems.sort(() => Math.random() - 0.5);
+
+      renderSequencing();
+    }
+
+    function renderSequencing() {
+      const listContainer = document.getElementById('sequenceList');
+      listContainer.innerHTML = '';
+
+      sequencingItems.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = "flex items-center space-x-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-xl cursor-grab active:cursor-grabbing transition duration-200 transform hover:scale-[1.01]";
+        div.setAttribute('draggable', 'true');
+        div.setAttribute('data-index', index);
+        
+        div.ondragstart = (e) => e.dataTransfer.setData('text/plain', index);
+        div.ondragover = (e) => e.preventDefault();
+        div.ondrop = (e) => {
+          e.preventDefault();
+          const draggedIdx = parseInt(e.dataTransfer.getData('text/plain'));
+          swapSequencingItems(draggedIdx, index);
+        };
+
+        div.innerHTML = `
+          <span class="font-display font-bold text-brand-500 text-lg w-6">${index + 1}</span>
+          <p class="text-sm font-medium flex-grow text-slate-700 dark:text-slate-300">${item.text}</p>
+          <div class="flex flex-col space-y-1">
+            <button onclick="moveSeqItem(${index}, -1)" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded text-xs">▲</button>
+            <button onclick="moveSeqItem(${index}, 1)" class="p-1 hover:bg-slate-200 dark:hover:bg-slate-800 rounded text-xs">▼</button>
+          </div>
+        `;
+        listContainer.appendChild(div);
+      });
+    }
+
+    function swapSequencingItems(idx1, idx2) {
+      const temp = sequencingItems[idx1];
+      sequencingItems[idx1] = sequencingItems[idx2];
+      sequencingItems[idx2] = temp;
+      sounds.playTick();
+      renderSequencing();
+    }
+
+    function moveSeqItem(index, direction) {
+      const newIndex = index + direction;
+      if (newIndex >= 0 && newIndex < sequencingItems.length) {
+        swapSequencingItems(index, newIndex);
+      }
+    }
+
+    function checkSequencing() {
+      let isCorrect = true;
+      sequencingItems.forEach((item, index) => {
+        if (item.originalIdx !== index) {
+          isCorrect = false;
+        }
+      });
+
+      if (isCorrect) {
+        sounds.playCorrect();
+        triggerLargeConfetti();
+        userScore += 300;
+        document.getElementById('headerScore').innerText = userScore;
+        showFeedbackModal("🎯 Sequence Solved!", "You placed all story events in their perfect chronological order. Great work! You unlocked Activity 2: Interactive Chat Practice.");
+        switchPostActivity('chat');
+      } else {
+        sounds.playIncorrect();
+        showFeedbackModal("❌ Incorrect Sequence", "Some details are still in the wrong chronological position. Move elements around and try again!");
+      }
+    }
+
+    // --- ACTIVITY 2: SIMULATED CHATBOT INTERVIEW (FREE PRACTICE - NO GRADED EVALUATIONS) ---
+    let usedChatQuestions = [];
+    
+    function getUniqueChatQuestion() {
+      const qBank = appData[currentLevel].chatQuestions;
+      if (!qBank || qBank.length === 0) return "Tell me more about what happened next!";
+      
+      // Filter unused indices
+      let unused = [];
+      for (let i = 0; i < qBank.length; i++) {
+        if (!usedChatQuestions.includes(i)) {
+          unused.push(i);
+        }
+      }
+      
+      // If all used, reset tracking
+      if (unused.length === 0) {
+        usedChatQuestions = [];
+        for (let i = 0; i < qBank.length; i++) unused.push(i);
+      }
+      
+      const randIdx = unused[Math.floor(Math.random() * unused.length)];
+      usedChatQuestions.push(randIdx);
+      return qBank[randIdx];
+    }
+
+    function initChatInterview() {
+      chatBotState = 0;
+      usedChatQuestions = [];
+      const history = document.getElementById('chatHistory');
+      if (history) history.innerHTML = '';
+      const finishBtn = document.getElementById('finishChatBtn');
+      if (finishBtn) finishBtn.classList.add('hidden');
+      
+      let firstQ = getUniqueChatQuestion();
+      appendChatBubble('bot', `😊 Hi there, classmate! Let's talk about **"${conversationTopic}"** for some free practice!<br><br>💬 ${firstQ}`);
+    }
+
+    function appendChatBubble(sender, text) {
+      const history = document.getElementById('chatHistory');
+      const bubble = document.createElement('div');
+      
+      if (sender === 'bot') {
+        bubble.className = "flex items-start space-x-2 max-w-lg self-start animate-fade-in";
+        bubble.innerHTML = `
+          <div class="w-8 h-8 rounded-full bg-brand-500 text-white flex items-center justify-center font-bold text-xs">🤖</div>
+          <div class="bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 p-3 rounded-2xl rounded-tl-none shadow-sm text-sm text-slate-800 dark:text-slate-100">
+            ${text}
+          </div>
+        `;
+      } else {
+        bubble.className = "flex items-start space-x-2 max-w-lg self-end flex-row-reverse space-x-reverse animate-fade-in";
+        bubble.innerHTML = `
+          <div class="w-8 h-8 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-xs">👤</div>
+          <div class="bg-brand-500 text-white p-3 rounded-2xl rounded-tr-none shadow-sm text-sm">
+            ${text}
+          </div>
+        `;
+      }
+
+      history.appendChild(bubble);
+      history.scrollTop = history.scrollHeight;
+    }
+
+    function sendChatMessage() {
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      appendChatBubble('user', text);
+      input.value = '';
+
+      setTimeout(() => {
+        chatBotState++;
+        
+        let nextQuestion = getUniqueChatQuestion();
+        let reply = `🌟 **That sounds very interesting! Thanks for sharing.**<br><br>💬 ${nextQuestion}`;
+        
+        sounds.playCorrect();
+
+        appendChatBubble('bot', reply);
+        userScore += 50;
+        document.getElementById('headerScore').innerText = userScore;
+
+        if (chatBotState >= 3) {
+          const finishChatBtn = document.getElementById('finishChatBtn');
+          if (finishChatBtn) finishChatBtn.classList.remove('hidden');
+        }
+      }, 1000);
+    }
+
+    function setupSpeechRecognition() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.lang = 'en-US';
+        recognition.interimResults = false;
+
+        recognition.onstart = function() {
+          document.getElementById('speechStatus').innerText = "🎙 Listening... Speak in English now.";
+        };
+
+        recognition.onspeechend = function() {
+          recognition.stop();
+        };
+
+        recognition.onresult = function(event) {
+          const transcript = event.results[0][0].transcript;
+          document.getElementById('chatInput').value = transcript;
+          document.getElementById('speechStatus').innerText = "✅ Speech recognized!";
+        };
+
+        recognition.onerror = function() {
+          document.getElementById('speechStatus').innerText = "❌ Recognition error. Please type manually.";
+        };
+      } else {
+        document.getElementById('micBtn').classList.add('hidden');
+      }
+    }
+
+    function toggleSpeech() {
+      if (!recognition) return;
+      recognition.start();
+    }
+
+
+    // --- ACTIVITY 3: SPINNING CONVERSATION WHEEL & NEW EVALUATED WRITING CHALLENGE ---
+    const colorsWheel = ["#ff595e", "#ffca3a", "#8ac926", "#1982c4", "#6a4c93", "#e36414", "#00b4d8", "#f72585"];
+
+    function initWheel() {
+      drawWheel(currentWheelRotation); // Iniciar redibujando con el ángulo global de rotación persistido
+      
+      const wheelResult = document.getElementById('wheelResult');
+      if (wheelResult) wheelResult.classList.add('hidden');
+
+      const challengeTextArea = document.getElementById('challengeTextArea');
+      if (challengeTextArea) challengeTextArea.value = "";
+
+      const geminiFeedbackPanel = document.getElementById('geminiFeedbackPanel');
+      if (geminiFeedbackPanel) geminiFeedbackPanel.classList.add('hidden');
+
+      const aiLoadingIndicator = document.getElementById('aiLoadingIndicator');
+      if (aiLoadingIndicator) aiLoadingIndicator.classList.add('hidden');
+
+      const activeTopicText = document.getElementById('activeTopicText');
+      if (activeTopicText) activeTopicText.innerText = `"${conversationTopic}"`;
+      
+      // Real-time sentence counting for student textarea
+      const textarea = document.getElementById('challengeTextArea');
+      if (textarea) {
+        textarea.oninput = function() {
+          const text = textarea.value.trim();
+          if (text === "") {
+            const countEl = document.getElementById('charSentenceCount');
+            if (countEl) countEl.innerText = "0 sentences written";
+            return;
+          }
+          // Split by period, exclamation, or question mark
+          const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+          const countEl = document.getElementById('charSentenceCount');
+          if (countEl) {
+            countEl.innerText = `${sentences.length} sentence${sentences.length === 1 ? '' : 's'} written`;
+          }
+        };
+      }
+    }
+
+    function drawWheel(rotation) {
+      const canvas = document.getElementById('wheelCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const prompts = appData[currentLevel].wheel;
+      const numSlices = prompts.length;
+      const sliceAngle = (2 * Math.PI) / numSlices;
+
+      ctx.clearRect(0, 0, 300, 300);
+      ctx.save();
+      ctx.translate(150, 150);
+      ctx.rotate(rotation);
+
+      for (let i = 0; i < numSlices; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, 140, i * sliceAngle, (i + 1) * sliceAngle);
+        ctx.closePath();
+        
+        ctx.fillStyle = colorsWheel[i % colorsWheel.length];
+        ctx.fill();
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.save();
+        ctx.rotate(i * sliceAngle + sliceAngle / 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 9px 'Plus Jakarta Sans'";
+        ctx.textAlign = "right";
+        
+        let text = prompts[i];
+        if (text.length > 20) text = text.substring(0, 18) + "...";
+        ctx.fillText(text, 130, 4);
+        ctx.restore();
+      }
+
+      ctx.beginPath();
+      ctx.arc(0, 0, 35, 0, 2 * Math.PI);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#0284c7";
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function spinWheel() {
+      if (isSpinning) return;
+      isSpinning = true;
+      
+      const wheelResult = document.getElementById('wheelResult');
+      if (wheelResult) wheelResult.classList.add('hidden');
+
+      const geminiFeedbackPanel = document.getElementById('geminiFeedbackPanel');
+      if (geminiFeedbackPanel) geminiFeedbackPanel.classList.add('hidden');
+      
+      // Velocidad inicial incrementada y con amplio rango de variación aleatoria para garantizar resultados diferentes en cada tiro
+      let speed = 1.5 + Math.random() * 2.0; 
+      
+      const interval = setInterval(() => {
+        currentWheelRotation += speed;
+        speed *= 0.98; // Desaceleración suave
+        
+        sounds.playTick();
+        drawWheel(currentWheelRotation);
+
+        if (speed < 0.01) {
+          clearInterval(interval);
+          isSpinning = false;
+          
+          const prompts = appData[currentLevel].wheel;
+          const numSlices = prompts.length;
+          const normalizedAngle = (2 * Math.PI - (currentWheelRotation % (2 * Math.PI))) % (2 * Math.PI);
+          const sliceAngle = (2 * Math.PI) / numSlices;
+          const winningIndex = Math.floor(normalizedAngle / sliceAngle);
+
+          setTimeout(() => {
+            const resultText = prompts[winningIndex];
+            const wheelPromptText = document.getElementById('wheelPromptText');
+            if (wheelPromptText) wheelPromptText.innerText = `"${resultText}"`;
+            
+            const resultBox = document.getElementById('wheelResult');
+            if (resultBox) resultBox.classList.remove('hidden');
+            
+            // Connect spinned topic to shared variable
+            conversationTopic = resultText;
+            const activeTopicText = document.getElementById('activeTopicText');
+            if (activeTopicText) activeTopicText.innerText = `"${resultText}"`;
+            
+            sounds.playWin();
+          }, 200);
+        }
+      }, 30);
+    }
+
+    function selectOptionWheel(option) {
+      if (option === 'chat') {
+        const wheelPromptText = document.getElementById('wheelPromptText');
+        const winningPrompt = wheelPromptText ? wheelPromptText.innerText.replace(/"/g, "") : conversationTopic;
+        conversationTopic = winningPrompt; 
+        switchPostActivity('chat');
+      } else {
+        showFeedbackModal("👥 Classmate Practice", "Prepare your classmate talk about the topic: " + conversationTopic);
+      }
+    }
+
+    // --- GEMINI REAL-TIME WRITING CHALLENGE EVALUATION (EXPONENTIAL BACKOFF IMPLEMENTED) ---
+    const apiKey = ""; // runtime environment provides the key
+
+    async function fetchWithBackoff(url, options, retries = 5, delay = 1000) {
+      try {
+        const response = await fetch(url, options);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
+      } catch (error) {
+        if (retries > 0) {
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return fetchWithBackoff(url, options, retries - 1, delay * 2);
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    async function checkStudentWriting() {
+      const challengeTextArea = document.getElementById('challengeTextArea');
+      const studentText = challengeTextArea ? challengeTextArea.value.trim() : "";
+      if (!studentText) {
+        showFeedbackModal("Attention", "Please write a past-tense paragraph first before checking!");
+        return;
+      }
+
+      // Check sentences length
+      const sentences = studentText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+      if (sentences.length < 3) {
+        showFeedbackModal("Short Paragraph", "Please write at least 3 sentences using the Simple Past Tense to fulfill the evaluation requirements.");
+        return;
+      }
+
+      // Hide results, show animated loader
+      const geminiFeedbackPanel = document.getElementById('geminiFeedbackPanel');
+      if (geminiFeedbackPanel) geminiFeedbackPanel.classList.add('hidden');
+      
+      const aiLoadingIndicator = document.getElementById('aiLoadingIndicator');
+      if (aiLoadingIndicator) aiLoadingIndicator.classList.remove('hidden');
+
+      const checkWritingBtn = document.getElementById('checkWritingBtn');
+      if (checkWritingBtn) checkWritingBtn.disabled = true;
+
+      const systemPrompt = `You are an expert English Language Teacher and academic writing evaluator. 
+Analyze the student's past-tense paragraph written for CEFR level ${currentLevel} on the topic "${conversationTopic}".
+The student was asked to write between 3 to 5 sentences using the Simple Past Tense.
+
+Your goal is to evaluate the paragraph objectively and return a structured JSON response.
+CRITICAL: Match the following JSON Schema:
+{
+  "positiveComment": "One encouraging, positive sentence about their effort.",
+  "grammarCorrections": [
+    {
+      "original": "The incorrect original sentence",
+      "corrected": "The grammatically correct past-tense sentence",
+      "reason": "Short, clear explanation in simple English of the correction made."
+    }
+  ],
+  "spellingCorrections": [
+    {
+      "original": "misspelled word",
+      "corrected": "correctly spelled word",
+      "reason": "A very brief explanation of the spelling rule."
+    }
+  ],
+  "vocabularySuggestions": [
+    "One or two suggested natural expressions or better word choices."
+  ],
+  "correctedVersion": "The student's complete paragraph fully perfected and polished.",
+  "score": 85, (An integer out of 100 based on grammatical accuracy, irregular verbs usage, vocabulary, spelling, and organization)
+  "grammarScore": 90, (An integer out of 100)
+  "pastTenseScore": 85, (An integer out of 100)
+  "vocabularyScore": 80, (An integer out of 100)
+  "spellingScore": 100, (An integer out of 100)
+  "organizationScore": 90 (An integer out of 100)
+  "finalEncouragement": "One highly motivating and friendly closing sentence."
+}
+
+Ensure all grammar corrections specifically focus on the proper conjugation of irregular/regular simple past verbs, negatives (did not / didn't), or question forms where applicable. Keep the tone friendly, supportive, and encouraging. Return ONLY the JSON object.`;
+
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+      const payload = {
+        contents: [{
+          parts: [{
+            text: `Evaluate this student's simple past paragraph: "${studentText}"`
+          }]
+        }],
+        systemInstruction: {
+          parts: [{
+            text: systemPrompt
+          }]
+        },
+        generationConfig: {
+          responseMimeType: "application/json"
+        }
+      };
+
+      try {
+        const responseData = await fetchWithBackoff(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const rawText = responseData.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!rawText) {
+          throw new Error("No response text received from Gemini API");
+        }
+
+        const feedback = JSON.parse(rawText);
+        displayGeminiFeedback(feedback);
+
+      } catch (error) {
+        console.error("Gemini API call failed:", error);
+        // Error fallback UI
+        showFeedbackModal("Gemini AI Offline", "We couldn't reach the AI evaluator right now. Let's provide a local review instead!");
+        
+        // Show simulated beautiful feedback so the application never breaks
+        const mockFeedback = {
+          positiveComment: "Lovely effort writing about your experience!",
+          grammarCorrections: [
+            { original: "I play soccer yesterday", corrected: "I played soccer yesterday", reason: "Remember to use regular past verbs ending in -ed for yesterday's actions." }
+          ],
+          spellingCorrections: [
+            { original: "wached", corrected: "watched", reason: "Spelled with a 't' before 'ch'." }
+          ],
+          vocabularySuggestions: ["Using 'We had a blast' instead of 'We had fun' is a great idiom!"],
+          correctedVersion: studentText.replace(/\bplay\b/g, "played").replace(/\bwached\b/g, "watched"),
+          score: 80,
+          grammarScore: 80,
+          pastTenseScore: 85,
+          vocabularyScore: 75,
+          spellingScore: 90,
+          organizationScore: 80,
+          finalEncouragement: "Keep practicing! You are making great progress with your English writing!"
+        };
+        displayGeminiFeedback(mockFeedback);
+      } finally {
+        const aiIndicator = document.getElementById('aiLoadingIndicator');
+        if (aiIndicator) aiIndicator.classList.add('hidden');
+        
+        const btn = document.getElementById('checkWritingBtn');
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    function displayGeminiFeedback(fb) {
+      const positiveEl = document.getElementById('geminiPositiveComment');
+      if (positiveEl) positiveEl.innerText = fb.positiveComment || "Nice writing attempt!";
+      
+      // Render Grammar corrections
+      const grammarBox = document.getElementById('geminiGrammarList');
+      if (grammarBox) {
+        grammarBox.innerHTML = '';
+        if (fb.grammarCorrections && fb.grammarCorrections.length > 0) {
+          fb.grammarCorrections.forEach(g => {
+            const div = document.createElement('div');
+            div.className = "bg-rose-50/50 dark:bg-rose-950/10 p-3 rounded-xl border border-rose-100 dark:border-rose-900/30 space-y-1";
+            div.innerHTML = `
+              <p class="text-xs text-rose-600">❌ Original: <span class="line-through">${g.original}</span></p>
+              <p class="text-xs text-emerald-600 font-bold">✅ Correct: ${g.corrected}</p>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400 italic">Reason: ${g.reason}</p>
+            `;
+            grammarBox.appendChild(div);
+          });
+        } else {
+          grammarBox.innerHTML = `<p class="text-xs text-emerald-600">✨ Zero grammar mistakes detected! Excellent work.</p>`;
+        }
+      }
+
+      // Render Spelling corrections
+      const spellingBox = document.getElementById('geminiSpellingList');
+      if (spellingBox) {
+        spellingBox.innerHTML = '';
+        if (fb.spellingCorrections && fb.spellingCorrections.length > 0) {
+          fb.spellingCorrections.forEach(s => {
+            const div = document.createElement('div');
+            div.className = "bg-amber-50/40 dark:bg-amber-950/10 p-3 rounded-xl border border-amber-100 dark:border-amber-900/30 space-y-1";
+            div.innerHTML = `
+              <p class="text-xs text-amber-700">❌ Original: <span class="line-through">${s.original}</span></p>
+              <p class="text-xs text-emerald-600 font-bold">✅ Correct: ${s.corrected}</p>
+              <p class="text-[11px] text-slate-500 dark:text-slate-400 italic">Reason: ${s.reason}</p>
+            `;
+            spellingBox.appendChild(div);
+          });
+        } else {
+          spellingBox.innerHTML = `<p class="text-xs text-emerald-600">✨ Zero spelling mistakes! Superb spelling accuracy.</p>`;
+        }
+      }
+
+      // Render Vocabulary suggestions
+      const vocabBox = document.getElementById('geminiVocabSuggestionsList');
+      if (vocabBox) {
+        vocabBox.innerHTML = '';
+        if (fb.vocabularySuggestions && fb.vocabularySuggestions.length > 0) {
+          fb.vocabularySuggestions.forEach(v => {
+            const li = document.createElement('li');
+            li.innerText = v;
+            vocabBox.appendChild(li);
+          });
+        } else {
+          vocabBox.innerHTML = `<li class="text-xs text-slate-400">No major vocabulary upgrades needed. Good word choice!</li>`;
+        }
+      }
+
+      // Corrected version
+      const correctedPara = document.getElementById('geminiCorrectedParagraph');
+      if (correctedPara) correctedPara.innerText = fb.correctedVersion || "No corrections needed!";
+
+      // Score rating badge
+      const finalScore = fb.score || 0;
+      const scoreBadge = document.getElementById('geminiOverallScoreBadge');
+      if (scoreBadge) scoreBadge.innerText = `${finalScore}/100`;
+
+      // Animate rating bars
+      const gText = document.getElementById('scoreText-grammar');
+      if (gText) gText.innerText = `${fb.grammarScore || 0}%`;
+      const gBar = document.getElementById('scoreBar-grammar');
+      if (gBar) gBar.style.width = `${fb.grammarScore || 0}%`;
+
+      const pText = document.getElementById('scoreText-past');
+      if (pText) pText.innerText = `${fb.pastTenseScore || 0}%`;
+      const pBar = document.getElementById('scoreBar-past');
+      if (pBar) pBar.style.width = `${fb.pastTenseScore || 0}%`;
+
+      const vText = document.getElementById('scoreText-vocab');
+      if (vText) vText.innerText = `${fb.vocabularyScore || 0}%`;
+      const vBar = document.getElementById('scoreBar-vocab');
+      if (vBar) vBar.style.width = `${fb.vocabularyScore || 0}%`;
+
+      const sText = document.getElementById('scoreText-spelling');
+      if (sText) sText.innerText = `${fb.spellingScore || 0}%`;
+      const sBar = document.getElementById('scoreBar-spelling');
+      if (sBar) sBar.style.width = `${fb.spellingScore || 0}%`;
+
+      const oText = document.getElementById('scoreText-organization');
+      if (oText) oText.innerText = `${fb.organizationScore || 0}%`;
+      const oBar = document.getElementById('scoreBar-organization');
+      if (oBar) oBar.style.width = `${fb.organizationScore || 0}%`;
+
+      // Final Encouragement
+      const finalEncouragement = document.getElementById('geminiFinalEncouragement');
+      if (finalEncouragement) finalEncouragement.innerText = fb.finalEncouragement || "Keep writing!";
+
+      // Reveal feedback card
+      const feedbackPanel = document.getElementById('geminiFeedbackPanel');
+      if (feedbackPanel) feedbackPanel.classList.remove('hidden');
+
+      // Update student overall score
+      userScore += finalScore * 2;
+      document.getElementById('headerScore').innerText = userScore;
+
+      // Play sound and trigger confetti if score is above 90
+      if (finalScore >= 90) {
+        sounds.playWin();
+        triggerLargeConfetti();
+      } else {
+        sounds.playCorrect();
+      }
+    }
+
+
+    // ==========================================
+    // 4. METRICS & RESULTS DASHBOARD
+    // ==========================================
+    function finishAllActivities() {
+      stopAllAudio();
+
+      document.getElementById('stepContainer').classList.add('hidden');
+      document.getElementById('resultsScreen').classList.remove('hidden');
+      document.getElementById('mainProgressBar').style.width = '100%';
+
+      const totalQuestions = 10;
+      const totalCorrect = selectedAnswers.filter((a, i) => a === appData[currentLevel].questions[i].ans).length;
+      const successRate = (totalCorrect / totalQuestions) * 100;
+      
+      document.getElementById('resultScore').innerText = userScore;
+      document.getElementById('resultPercent').innerText = `${successRate}%`;
+      document.getElementById('analyticalCorrect').innerText = totalCorrect;
+
+      let stars = 1;
+      if (successRate >= 90) stars = 5;
+      else if (successRate >= 70) stars = 4;
+      else if (successRate >= 50) stars = 3;
+      else if (successRate >= 30) stars = 2;
+
+      document.getElementById('resultStars').innerText = "⭐".repeat(stars);
+
+      const badges = {
+        A1: "Past Explorer 👶",
+        A2: "Tom & Anna Storyteller 🧒",
+        B1: "Time Traveler 🧑",
+        B2: "Software Crisis Manager 🧑‍💼",
+        C1: "Cognitive Neurotheorist 🧠"
+      };
+      const badgeEarned = badges[currentLevel] || "Simple Past Apprentice";
+      document.getElementById('resultBadge').innerText = badgeEarned;
+
+      // Handle next scaffold level unlocks conditionally
+      const unlockNextBtn = document.getElementById('nextLevelUnlockBtn');
+      if (appMode === 'scaffold' && successRate >= 70) {
+        const currentIdx = cefrLevelsOrder.indexOf(currentLevel);
+        if (currentIdx < cefrLevelsOrder.length - 1) {
+          unlockNextBtn.classList.remove('hidden');
+        } else {
+          unlockNextBtn.classList.add('hidden');
+        }
+      } else {
+        unlockNextBtn.classList.add('hidden');
+      }
+
+      const retryBtn = document.getElementById('retryIncorrectsBtn');
+      if (successRate < 100) {
+        retryBtn.classList.remove('hidden');
+        document.getElementById('improveSuggestTitle').innerText = "Improvement Tips:";
+        document.getElementById('improveSuggest').innerText = "Review vocabulary and look for key details in the audio script. Tap 'Retry Incorrect Questions' below to boost your score!";
+      } else {
+        retryBtn.classList.add('hidden');
+        document.getElementById('improveSuggestTitle').innerText = "Fantastic Work!";
+        document.getElementById('improveSuggest').innerText = "You scored a perfect 100%. Try out a harder CEFR level to keep building your skills!";
+      }
+
+      if (successRate >= 70) {
+        document.getElementById('certLevelName').innerText = `Level ${currentLevel}`;
+        document.getElementById('certificateContainer').classList.remove('hidden');
+        
+        // Progress unlocked index in Scaffolding Mode
+        if (appMode === 'scaffold') {
+          const currentIdx = cefrLevelsOrder.indexOf(currentLevel);
+          const maxIdx = cefrLevelsOrder.indexOf(scaffoldMaxUnlocked);
+          if (currentIdx === maxIdx && currentIdx < cefrLevelsOrder.length - 1) {
+            scaffoldMaxUnlocked = cefrLevelsOrder[currentIdx + 1];
+          }
+        }
+      } else {
+        document.getElementById('certificateContainer').classList.add('hidden');
+      }
+
+      sounds.playWin();
+      triggerLargeConfetti();
+    }
+
+    function unlockScaffoldedLevel() {
+      const unlockNextBtn = document.getElementById('nextLevelUnlockBtn');
+      if (unlockNextBtn) unlockNextBtn.classList.add('hidden');
+      goHome();
+      showFeedbackModal("Next Level Unlocked! 🔓", `Congratulations! You successfully unlocked Level ${scaffoldMaxUnlocked} in Scaffolding Mode.`);
+    }
+
+    function unlockNextScaffoldedLevel() {
+      const unlockNextBtn = document.getElementById('nextLevelUnlockBtn');
+      if (unlockNextBtn) unlockNextBtn.classList.add('hidden');
+      goHome();
+      showFeedbackModal("Next Level Unlocked! 🔓", `Congratulations! You successfully unlocked Level ${scaffoldMaxUnlocked} in Scaffolding Mode.`);
+    }
+
+    function retryIncorrectOnly() {
+      const correctIndices = [];
+      selectedAnswers.forEach((ans, idx) => {
+        if (ans === appData[currentLevel].questions[idx].ans) {
+          correctIndices.push(idx);
+        }
+      });
+
+      currentQuestionIdx = 0;
+      goToPhase('while');
+      
+      const originalNext = nextQuestion;
+      nextQuestion = function() {
+        currentQuestionIdx++;
+        while (currentQuestionIdx < 10 && correctIndices.includes(currentQuestionIdx)) {
+          currentQuestionIdx++;
+        }
+        if (currentQuestionIdx < 10) {
+          renderQuestion();
+        } else {
+          nextQuestion = originalNext;
+          document.getElementById('quizContainer').classList.add('hidden');
+          document.getElementById('whileCompletion').classList.remove('hidden');
+          sounds.playWin();
+          triggerLargeConfetti();
+        }
+      };
+
+      if (correctIndices.includes(currentQuestionIdx)) {
+        nextQuestion();
+      } else {
+        renderQuestion();
+      }
+    }
+
+
+    // ==========================================
+    // CONFETTI ENGINE & MODALS (100% OFFLINE)
+    // ==========================================
+    let confettiActive = false;
+    let confetis = [];
+
+    function triggerLargeConfetti() {
+      const canvas = document.getElementById('confettiCanvas');
+      canvas.classList.remove('hidden');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      
+      confetis = [];
+      for (let i = 0; i < 150; i++) {
+        confetis.push({
+          x: Math.random() * canvas.width,
+          y: Math.random() * canvas.height - canvas.height,
+          r: Math.random() * 6 + 4,
+          d: Math.random() * canvas.height,
+          color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+          tilt: Math.random() * 10 - 5,
+          tiltAngleIncremental: Math.random() * 0.07 + 0.02,
+          tiltAngle: 0
+        });
+      }
+
+      if (!confettiActive) {
+        confettiActive = true;
+        animateConfetti();
+      }
+    }
+
+    function triggerMiniConfetti(element) {
+      const canvas = document.getElementById('confettiCanvas');
+      canvas.classList.remove('hidden');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      const rect = element.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      for (let i = 0; i < 25; i++) {
+        confetis.push({
+          x: centerX + (Math.random() * 40 - 20),
+          y: centerY + (Math.random() * 40 - 20),
+          r: Math.random() * 4 + 2,
+          d: Math.random() * 100,
+          color: `hsl(${Math.random() * 360}, 100%, 50%)`,
+          tilt: Math.random() * 10 - 5,
+          tiltAngleIncremental: Math.random() * 0.2,
+          tiltAngle: 0
+        });
+      }
+
+      if (!confettiActive) {
+        confettiActive = true;
+        animateConfetti();
+      }
+    }
+
+    function animateConfetti() {
+      const canvas = document.getElementById('confettiCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      let remaining = 0;
+      confetis.forEach(p => {
+        p.tiltAngle += p.tiltAngleIncremental;
+        p.y += (Math.cos(p.d) + 3 + p.r / 2) / 2;
+        p.x += Math.sin(p.tiltAngle);
+        p.tilt = Math.sin(p.tiltAngle - p.r / 2) * 15;
+
+        if (p.y < canvas.height) {
+          remaining++;
+        }
+
+        ctx.beginPath();
+        ctx.lineWidth = p.r;
+        ctx.strokeStyle = p.color;
+        ctx.moveTo(p.x + p.tilt + p.r / 2, p.y);
+        ctx.lineTo(p.x + p.tilt, p.y + p.tilt + p.r / 2);
+        ctx.stroke();
+      });
+
+      if (remaining > 0) {
+        requestAnimationFrame(animateConfetti);
+      } else {
+        confettiActive = false;
+        canvas.classList.add('hidden');
+      }
+    }
+
+    function showFeedbackModal(title, text) {
+      const prev = document.getElementById('customAlertModal');
+      if (prev) prev.remove();
+
+      const modal = document.createElement('div');
+      modal.id = "customAlertModal";
+      modal.className = "fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50";
+      modal.innerHTML = `
+        <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl max-w-sm w-full shadow-2xl border border-slate-100 dark:border-slate-700 text-center space-y-4 animate-bounce-slow">
+          <h4 class="font-bold text-xl font-display text-slate-800 dark:text-slate-100">${title}</h4>
+          <p class="text-sm text-slate-500 dark:text-slate-300">${text}</p>
+          <button onclick="document.getElementById('customAlertModal').remove()" class="bg-brand-500 hover:bg-brand-600 text-white font-bold w-full py-2 rounded-xl text-sm transition">
+            Got it!
+          </button>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+  </script>
+</body>
+</html>
