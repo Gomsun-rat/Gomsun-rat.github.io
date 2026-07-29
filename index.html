@@ -1,1754 +1,1170 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ReadBridge - Your Bridge to Understanding English</title>
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Volume2, VolumeX, Award, Star, ArrowRight, RotateCcw, 
+  CheckCircle2, XCircle, Sparkles, HelpCircle, ChevronRight, 
+  ChevronDown, ChevronUp, MoveVertical, Play, Pause, Anchor,
+  Compass, Shield, RefreshCw, User, BookOpen, Smile, Sparkle
+} from 'lucide-react';
 
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Comic+Neue:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;500;600;700&family=Lexend:wght@400;500;600;700&display=swap" rel="stylesheet">
+const createAudioContext = () => {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  return AudioContext ? new AudioContext() : null;
+};
 
-    <!-- FontAwesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+const playSoundEffect = (type) => {
+  try {
+    const ctx = createAudioContext();
+    if (!ctx) return;
 
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    if (type === 'success') {
+      const now = ctx.currentTime;
+      [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.15, now + idx * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + idx * 0.08);
+        osc.stop(now + idx * 0.08 + 0.25);
+      });
+    } else if (type === 'error') {
+      const now = ctx.currentTime;
+      [220, 196].forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.12, now + idx * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.12 + 0.18);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + idx * 0.12);
+        osc.stop(now + idx * 0.12 + 0.2);
+      });
+    } else if (type === 'pop') {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(400, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.05);
+      gain.gain.setValueAtTime(0.2, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.06);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.06);
+    } else if (type === 'celebrate') {
+      const now = ctx.currentTime;
+      const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51];
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.15, now + idx * 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + idx * 0.06);
+        osc.stop(now + 1.3);
+      });
+    }
+  } catch (e) {
+    console.warn('Audio effect playback failed', e);
+  }
+};
 
-    <style>
-        :root {
-            --bg-cream: #FDFBF7;
-            --bg-cream-dark: #F5EFEB;
-            --color-subject: #2563EB;     /* Blue for Subject */
-            --color-verb: #16A34A;        /* Green for Verb */
-            --color-complement: #EA580C;  /* Orange for Complement */
-            --color-navy: #0F172A;        /* Dark Blue for Text */
-            
-            --font-main: 'Comic Neue', 'Lexend', 'Inter', sans-serif;
-            --line-spacing: 1.8;
-            --word-spacing: 0.18em;
-            --letter-spacing: 0.05em;
-            --text-base-size: 19px;
+const READ_ASSESSMENT_DATA = {
+  A1: {
+    id: 'A1',
+    levelTitle: 'Level 1: Beginner (A1)',
+    cefrBadge: 'CEFR A1 • Word-by-Word & Literal Facts',
+    topic: 'The Playful Dolphin',
+    avatar: '🐬',
+    bgGradient: 'from-cyan-500 to-blue-600',
+    passageTitle: 'The Playful Dolphin',
+    readingTip: 'Read word by word. Focus on simple facts!',
+    passageParagraphs: [
+      {
+        text: 'This is a dolphin. Dolphins live in the warm {ocean}. The ocean is big and blue.',
+        highlights: {
+          ocean: { word: 'ocean', emoji: '🌊', definition: 'A big blue sea with water.' }
         }
+      },
+      {
+        text: 'Dolphins are not fish. They are {mammals}. Dolphins need air. They {jump} out of the water to get air.',
+        highlights: {
+          mammals: { word: 'mammals', emoji: '🫁', definition: 'Animals that breathe air and feed milk to babies.' },
+          jump: { word: 'jump', emoji: '🐬', definition: 'To leap up into the air.' }
+        }
+      },
+      {
+        text: 'Dolphins are smart and friendly. They eat small {fish} and swim fast with friends.',
+        highlights: {
+          fish: { word: 'fish', emoji: '🐟', definition: 'Small animals that swim in water.' }
+        }
+      }
+    ],
+    questions: [
+      {
+        id: 'q1_a1',
+        type: 'multiple_choice_image',
+        prompt: 'Where do dolphins live?',
+        subtitle: 'Literal detail check:',
+        options: [
+          { id: 'a', text: 'In a forest', icon: '🌲', imageAlt: 'Forest' },
+          { id: 'b', text: 'In the warm ocean', icon: '🌊', imageAlt: 'Ocean', isCorrect: true },
+          { id: 'c', text: 'On a farm', icon: '🚜', imageAlt: 'Farm' }
+        ]
+      },
+      {
+        id: 'q2_a1',
+        type: 'true_false',
+        prompt: 'Dolphins can breathe underwater like fish.',
+        subtitle: 'Fact check from story:',
+        correctValue: false,
+        explanation: 'False! Dolphins are mammals and jump up to get air.'
+      },
+      {
+        id: 'q3_a1',
+        type: 'matching',
+        prompt: 'Read each sentence and tap its picture!',
+        pairs: [
+          { id: 'm1', sentence: 'This animal is a dolphin.', icon: '🐬' },
+          { id: 'm2', sentence: 'The ocean is big and blue.', icon: '🌊' },
+          { id: 'm3', sentence: 'Dolphins eat small fish.', icon: '🐟' }
+        ]
+      },
+      {
+        id: 'q4_a1',
+        type: 'multiple_choice_text',
+        prompt: 'What do dolphins eat?',
+        subtitle: 'Local detail search:',
+        options: [
+          { id: 'a', text: 'Apples and bananas', isCorrect: false },
+          { id: 'b', text: 'Small fish', isCorrect: true },
+          { id: 'c', text: 'Bread and cheese', isCorrect: false }
+        ]
+      },
+      {
+        id: 'q5_a1',
+        type: 'multiple_choice_text',
+        prompt: 'Why do dolphins jump out of the water?',
+        subtitle: 'Simple cause and effect:',
+        options: [
+          { id: 'a', text: 'To get air to breathe', isCorrect: true },
+          { id: 'b', text: 'To sleep on a tree', isCorrect: false },
+          { id: 'c', text: 'To run on sand', isCorrect: false }
+        ]
+      }
+    ]
+  },
 
-        body {
-            font-family: var(--font-main);
-            line-height: var(--line-spacing);
-            letter-spacing: var(--letter-spacing);
-            word-spacing: var(--word-spacing);
-            font-size: var(--text-base-size);
-            background-color: var(--bg-cream);
-            color: var(--color-navy);
-            transition: background-color 0.3s ease, color 0.3s ease, font-size 0.2s ease;
+  A2: {
+    id: 'A2',
+    levelTitle: 'Level 2: Elementary (A2)',
+    cefrBadge: 'CEFR A2 • Connected Sentences & Connectors',
+    topic: 'The Journey of Sea Turtles',
+    avatar: '🐢',
+    bgGradient: 'from-emerald-500 to-teal-700',
+    passageTitle: 'The Journey of Sea Turtles',
+    readingTip: 'Look for linking words like because, when, and so!',
+    passageParagraphs: [
+      {
+        text: 'Sea turtles are quiet ocean animals. They have a hard {shell} on their back because it {protects} them from big sharks.',
+        highlights: {
+          shell: { word: 'shell', emoji: '🐢', definition: 'A hard outer cover that keeps an animal safe.' },
+          protects: { word: 'protects', emoji: '🛡️', definition: 'Keeps safe from danger.' }
         }
+      },
+      {
+        text: 'Turtles like to eat jellyfish. But plastic bags look like jellyfish in the water, so turtles eat plastic by mistake and get sick.',
+        highlights: {}
+      },
+      {
+        text: 'When a mother turtle is ready to lay eggs, she swims to the sand beach. She digs a hole so her eggs stay safe. After two months, baby turtles {hatch} and race into the ocean!',
+        highlights: {
+          hatch: { word: 'hatch', emoji: '🥚', definition: 'To come out of an egg when born.' }
+        }
+      }
+    ],
+    questions: [
+      {
+        id: 'q1_a2',
+        type: 'multiple_choice_text',
+        prompt: 'Why do sea turtles have a hard shell on their back?',
+        subtitle: 'Cause & Effect (because):',
+        options: [
+          { id: 'a', text: 'To sleep comfortably on sand', isCorrect: false },
+          { id: 'b', text: 'Because it protects them from big sharks', isCorrect: true },
+          { id: 'c', text: 'To swim faster than fish', isCorrect: false }
+        ]
+      },
+      {
+        id: 'q2_a2',
+        type: 'multiple_choice_text',
+        prompt: 'Why do sea turtles eat plastic bags by mistake?',
+        subtitle: 'Sentence Connectors (so / look like):',
+        options: [
+          { id: 'a', text: 'Because plastic bags look like jellyfish in water', isCorrect: true },
+          { id: 'b', text: 'Because plastic tastes like sweet candy', isCorrect: false },
+          { id: 'c', text: 'Because fish throw plastic at them', isCorrect: false }
+        ]
+      },
+      {
+        id: 'q3_a2',
+        type: 'sequence',
+        prompt: "Put the mother sea turtle's story in order (1 to 3):",
+        items: [
+          { id: 's2', text: 'She digs a hole in the sand to hide her eggs.', correctOrder: 2 },
+          { id: 's1', text: 'She swims to the sand beach when ready.', correctOrder: 1 },
+          { id: 's3', text: 'Baby turtles hatch and race into the ocean.', correctOrder: 3 }
+        ]
+      },
+      {
+        id: 'q4_a2',
+        type: 'context_vocabulary',
+        prompt: 'What does the word "protects" mean in the story?',
+        passageContext: '"...a hard shell on their back because it protects them from big sharks."',
+        options: [
+          { id: 'a', text: 'Makes them shiny and pretty', isCorrect: false },
+          { id: 'b', text: 'Keeps them safe from danger', isCorrect: true },
+          { id: 'c', text: 'Helps them jump very high', isCorrect: false }
+        ]
+      },
+      {
+        id: 'q5_a2',
+        type: 'multiple_choice_text',
+        prompt: 'What is the main idea of this story?',
+        subtitle: 'Global Understanding:',
+        options: [
+          { id: 'a', text: 'Sea turtles live in forests and fly in the sky', isCorrect: false },
+          { id: 'b', text: 'Sea turtles have shells for protection, lay eggs on sand, and need clean oceans', isCorrect: true },
+          { id: 'c', text: 'Sharks like to play games with baby turtles', isCorrect: false }
+        ]
+      }
+    ]
+  }
+};
 
-        /* High Contrast Mode */
-        body.high-contrast {
-            background-color: #0F172A !important;
-            color: #F8FAFC !important;
-            --color-navy: #F8FAFC !important;
-            --bg-cream: #0F172A !important;
-            --bg-cream-dark: #1E293B !important;
-        }
+const SubmarineIcon = ({ className = "w-10 h-10" }) => (
+  <svg className={className} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M15 50 C15 35 30 25 55 25 C80 25 90 38 90 50 C90 62 80 75 55 75 C30 75 15 65 15 50 Z" fill="#FBBF24" stroke="#D97706" strokeWidth="4" />
+    <circle cx="40" cy="50" r="7" fill="#38BDF8" stroke="#0284C7" strokeWidth="3" />
+    <circle cx="60" cy="50" r="7" fill="#38BDF8" stroke="#0284C7" strokeWidth="3" />
+    <path d="M50 25 L50 12 C50 10 52 8 55 8 L62 8" stroke="#F59E0B" strokeWidth="5" strokeLinecap="round" />
+    <path d="M15 42 L5 38 V62 L15 58 Z" fill="#F59E0B" />
+    <circle cx="90" cy="50" r="3" fill="#EF4444" />
+  </svg>
+);
 
-        body.high-contrast .card-theme {
-            background-color: #1E293B !important;
-            border-color: #334155 !important;
-            color: #F8FAFC !important;
-        }
+const UnderwaterBubbles = () => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+    <div className="bubble bubble-1 absolute bottom-[-20px] left-[10%] w-8 h-8 rounded-full bg-white/20 border border-white/40 animate-float-slow"></div>
+    <div className="bubble bubble-2 absolute bottom-[-20px] left-[30%] w-5 h-5 rounded-full bg-white/25 border border-white/40 animate-float-medium"></div>
+    <div className="bubble bubble-3 absolute bottom-[-20px] left-[65%] w-10 h-10 rounded-full bg-white/15 border border-white/30 animate-float-slow"></div>
+    <div className="bubble bubble-4 absolute bottom-[-20px] left-[85%] w-6 h-6 rounded-full bg-white/20 border border-white/40 animate-float-fast"></div>
+  </div>
+);
 
-        body.high-contrast .subcard-theme {
-            background-color: #0F172A !important;
-            border-color: #475569 !important;
-        }
+const InteractivePassageText = ({ paragraph, onSpeakWord }) => {
+  const [activeTooltip, setActiveTooltip] = useState(null);
 
-        /* Focus Mode */
-        body.focus-mode .distraction-element {
-            display: none !important;
-        }
+  const renderTextParts = () => {
+    const parts = [];
+    const text = paragraph.text;
+    const regex = /\{(\w+)\}/g;
+    let lastIndex = 0;
+    let match;
 
-        /* Grammar Color Coding */
-        .token-subject {
-            color: var(--color-subject) !important;
-            font-weight: 700;
-        }
-        .token-verb {
-            color: var(--color-verb) !important;
-            font-weight: 700;
-            border-bottom: 2px dashed var(--color-verb);
-        }
-        .token-complement {
-            color: var(--color-complement) !important;
-            font-weight: 700;
-        }
+    while ((match = regex.exec(text)) !== null) {
+      const matchIndex = match.index;
+      const wordKey = match[1];
+      const highlightInfo = paragraph.highlights[wordKey];
 
-        /* Sentence Highlight in Reading Mode */
-        .highlighted-sentence {
-            background-color: #FEF08A;
-            border-radius: 6px;
-            padding: 4px 8px;
-            border-left: 5px solid #EAB308;
-            box-shadow: 0 2px 8px rgba(234, 179, 8, 0.25);
-        }
-        body.high-contrast .highlighted-sentence {
-            background-color: #312E81 !important;
-            border-left: 5px solid #818CF8 !important;
-            color: #EEF2FF !important;
-        }
+      if (matchIndex > lastIndex) {
+        parts.push(text.substring(lastIndex, matchIndex));
+      }
 
-        /* Touch & Click targets */
-        .tap-target {
-            min-height: 44px;
-            min-width: 44px;
-        }
+      if (highlightInfo) {
+        parts.push(
+          <span key={matchIndex} className="relative inline-block mx-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                playSoundEffect('pop');
+                setActiveTooltip(activeTooltip === wordKey ? null : wordKey);
+                onSpeakWord(highlightInfo.word);
+              }}
+              className="px-2.5 py-1 rounded-xl bg-amber-300 hover:bg-amber-400 text-amber-950 font-extrabold underline decoration-wavy decoration-amber-600 transition-all hover:scale-105 shadow-xs cursor-pointer inline-flex items-center gap-1 text-xl sm:text-2xl"
+            >
+              <span>{highlightInfo.word}</span>
+              <span className="text-lg">{highlightInfo.emoji}</span>
+            </button>
 
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: rgba(0,0,0,0.05);
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #CBD5E1;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94A3B8;
-        }
-    </style>
-</head>
-<body class="min-h-screen flex flex-col antialiased selection:bg-amber-200">
+            {activeTooltip === wordKey && (
+              <div 
+                className="absolute left-1/2 bottom-full mb-3 -translate-x-1/2 w-64 p-3.5 bg-white rounded-2xl shadow-2xl border-4 border-amber-400 z-50 text-slate-800 animate-in fade-in zoom-in duration-200"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between border-b pb-1.5 mb-2 border-slate-100">
+                  <span className="font-extrabold text-lg text-amber-600 capitalize flex items-center gap-2">
+                    <span className="text-2xl">{highlightInfo.emoji}</span> {highlightInfo.word}
+                  </span>
+                  <button 
+                    onClick={() => setActiveTooltip(null)}
+                    className="text-slate-400 hover:text-slate-600 p-1 rounded-full text-xs font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="text-base text-slate-700 font-medium leading-snug">
+                  {highlightInfo.definition}
+                </div>
+                <div className="mt-2.5 pt-1.5 border-t border-slate-100 flex justify-end">
+                  <button
+                    onClick={() => onSpeakWord(highlightInfo.word)}
+                    className="text-xs bg-amber-100 text-amber-900 px-2.5 py-1 rounded-lg font-bold hover:bg-amber-200 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Volume2 className="w-3.5 h-3.5 text-amber-700" /> Listen
+                  </button>
+                </div>
+                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-8 border-transparent border-t-amber-400"></div>
+              </div>
+            )}
+          </span>
+        );
+      } else {
+        parts.push(wordKey);
+      }
 
-<header class="bg-slate-900 text-white shadow-lg sticky top-0 z-50 py-3 px-4 distraction-element">
-    <div class="max-w-7xl mx-auto flex flex-wrap justify-between items-center gap-3">
-        <a href="#home" class="flex items-center gap-2 group">
-            <span class="text-2xl sm:text-3xl">🌉</span>
-            <div>
-                <h1 class="text-xl font-bold tracking-wide text-amber-400 group-hover:text-amber-300 transition-colors">ReadBridge</h1>
-                <p class="text-xs text-slate-300 hidden sm:block">A1–A2 Interactive English Workbook</p>
+      lastIndex = regex.lastIndex;
+    }
+
+    if (lastIndex < text.length) {
+      parts.push(text.substring(lastIndex));
+    }
+
+    return parts;
+  };
+
+  return (
+    <div className="mb-4 text-slate-800 text-xl sm:text-2xl leading-relaxed font-sans font-medium tracking-normal">
+      {renderTextParts()}
+    </div>
+  );
+};
+
+const ImageMultipleChoiceQuestion = ({ question, selectedOption, onSelect }) => {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 my-4">
+      {question.options.map((opt) => {
+        const isSelected = selectedOption === opt.id;
+        return (
+          <button
+            key={opt.id}
+            onClick={() => {
+              playSoundEffect('pop');
+              onSelect(opt.id);
+            }}
+            className={`p-4 rounded-2xl border-4 text-center flex flex-col items-center justify-between transition-all duration-200 cursor-pointer ${
+              isSelected
+                ? 'bg-amber-100 border-amber-500 text-amber-950 font-black shadow-lg scale-105 ring-4 ring-amber-300/50'
+                : 'bg-white border-slate-200 hover:border-sky-300 text-slate-800 font-bold shadow-xs hover:scale-102'
+            }`}
+          >
+            <div className="text-5xl sm:text-6xl my-2 transform transition-transform hover:scale-110">
+              {opt.icon}
             </div>
-        </a>
-
-        <!-- Desktop & Tablet Navigation links -->
-        <nav class="flex items-center gap-2 flex-wrap text-sm font-semibold">
-            <a href="#home" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 transition tap-target flex items-center gap-1.5">
-                <i class="fa-solid fa-house text-amber-400"></i> Home
-            </a>
-            <a href="#verbs" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 transition tap-target flex items-center gap-1.5">
-                <i class="fa-solid fa-book-bookmark text-emerald-400"></i> Verbs
-            </a>
-            <a href="#progress" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 transition tap-target flex items-center gap-1.5">
-                <i class="fa-solid fa-star text-yellow-400"></i> Progress
-            </a>
-            <a href="#preferences" class="px-3 py-2 rounded-lg bg-indigo-800 hover:bg-indigo-700 text-slate-100 transition tap-target flex items-center gap-1.5">
-                <i class="fa-solid fa-sliders text-indigo-300"></i> Display
-            </a>
-            <a href="#teacher" class="px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 transition tap-target flex items-center gap-1.5">
-                <i class="fa-solid fa-chalkboard-user text-sky-400"></i> Teacher Hub
-            </a>
-        </nav>
+            <span className="text-lg font-extrabold">{opt.text}</span>
+          </button>
+        );
+      })}
     </div>
-</header>
+  );
+};
 
-<main class="flex-grow flex flex-col max-w-6xl w-full mx-auto p-4 sm:p-6 md:p-8" id="app-container">
-    <div class="text-center py-20">
-        <i class="fa-solid fa-circle-notch fa-spin text-5xl text-indigo-600 mb-4"></i>
-        <p class="text-xl font-semibold">Loading ReadBridge Learning Environment...</p>
+const TrueFalseQuestion = ({ selectedValue, onSelect }) => {
+  return (
+    <div className="flex flex-col sm:flex-row gap-4 my-6 justify-center">
+      <button
+        onClick={() => {
+          playSoundEffect('pop');
+          onSelect(true);
+        }}
+        className={`flex-1 py-6 px-8 rounded-2xl border-4 text-2xl font-black flex items-center justify-center gap-3 transition-all cursor-pointer ${
+          selectedValue === true
+            ? 'bg-emerald-500 text-white border-emerald-600 shadow-xl scale-105'
+            : 'bg-white text-emerald-600 border-emerald-200 hover:border-emerald-400 shadow-md'
+        }`}
+      >
+        <span className="text-3xl">👍</span> True
+      </button>
+      <button
+        onClick={() => {
+          playSoundEffect('pop');
+          onSelect(false);
+        }}
+        className={`flex-1 py-6 px-8 rounded-2xl border-4 text-2xl font-black flex items-center justify-center gap-3 transition-all cursor-pointer ${
+          selectedValue === false
+            ? 'bg-rose-500 text-white border-rose-600 shadow-xl scale-105'
+            : 'bg-white text-rose-600 border-rose-200 hover:border-rose-400 shadow-md'
+        }`}
+      >
+        <span className="text-3xl">👎</span> False
+      </button>
     </div>
-</main>
+  );
+};
 
-<footer class="bg-slate-900 text-slate-300 border-t border-slate-800 py-6 px-4 mt-auto distraction-element text-center text-sm">
-    <div class="max-w-4xl mx-auto space-y-2">
-        <p class="font-bold text-slate-100 text-base">🌉 ReadBridge: Your Interactive Bridge to English Reading & Fluency</p>
-        <p class="text-xs text-slate-400 leading-relaxed max-w-2xl mx-auto">
-            Designed to complement printed A1–A2 ESL workbooks. Includes adjustable visual spacing, line-by-line speech audio, active grammar highlighting, drag-and-drop sentence builders, and speech recognition practice.
-        </p>
-        <div class="pt-2 text-xs text-amber-400 flex justify-center items-center gap-4 flex-wrap">
-            <span><i class="fa-solid fa-circle-check text-emerald-400 mr-1"></i> A1-A2 CEFR Aligned</span>
-            <span><i class="fa-solid fa-volume-high text-indigo-400 mr-1"></i> Audio Pronunciation</span>
-            <span><i class="fa-solid fa-eye text-sky-400 mr-1"></i> Accessible Layouts</span>
+const MatchingQuestion = ({ pairs, matches, onMatchPair }) => {
+  const [selectedWord, setSelectedWord] = useState(null);
+
+  const sentences = pairs.map(p => ({ id: p.id, text: p.sentence }));
+  const targets = pairs.map(p => ({ id: p.id, icon: p.icon }));
+
+  const handleWordClick = (wordId) => {
+    playSoundEffect('pop');
+    setSelectedWord(wordId);
+  };
+
+  const handleTargetClick = (targetId) => {
+    if (selectedWord) {
+      playSoundEffect('pop');
+      onMatchPair(selectedWord, targetId);
+      setSelectedWord(null);
+    }
+  };
+
+  return (
+    <div className="my-4">
+      <p className="text-xs sm:text-sm text-sky-800 font-bold mb-3 text-center bg-sky-100 py-1.5 px-4 rounded-full inline-block mx-auto border border-sky-200">
+        👉 Tap a sentence on the left, then tap its picture on the right!
+      </p>
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Left Column: Sentences */}
+        <div className="flex flex-col gap-3">
+          <h4 className="font-extrabold text-slate-600 text-xs uppercase tracking-wider text-center">Sentences</h4>
+          {sentences.map((item) => {
+            const matchedTargetId = matches[item.id];
+            const isSelected = selectedWord === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleWordClick(item.id)}
+                className={`p-3.5 rounded-2xl border-3 text-base sm:text-lg font-black flex items-center justify-between transition-all cursor-pointer text-left ${
+                  matchedTargetId
+                    ? 'bg-emerald-100 border-emerald-400 text-emerald-900'
+                    : isSelected
+                    ? 'bg-amber-200 border-amber-500 text-amber-950 ring-4 ring-amber-300/50 scale-102'
+                    : 'bg-white border-slate-200 hover:border-sky-300 text-slate-800 shadow-xs'
+                }`}
+              >
+                <span>{item.text}</span>
+                {matchedTargetId && <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 ml-2" />}
+              </button>
+            );
+          })}
         </div>
+
+        {/* Right Column: Pictures ONLY (no text labels) */}
+        <div className="flex flex-col gap-3">
+          <h4 className="font-extrabold text-slate-600 text-xs uppercase tracking-wider text-center">Pictures</h4>
+          <div className="flex flex-col gap-3">
+            {targets.map((target) => {
+              const matchedWordId = Object.keys(matches).find(k => matches[k] === target.id);
+              return (
+                <button
+                  key={target.id}
+                  onClick={() => handleTargetClick(target.id)}
+                  className={`p-4 rounded-2xl border-3 flex items-center justify-center transition-all cursor-pointer min-h-[64px] ${
+                    matchedWordId
+                      ? 'bg-emerald-100 border-emerald-400 text-emerald-900 shadow-xs'
+                      : 'bg-white border-slate-200 hover:border-sky-400 shadow-xs hover:scale-102'
+                  }`}
+                >
+                  <span className="text-4xl sm:text-5xl">{target.icon}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </div>
     </div>
-</footer>
+  );
+};
 
-<script>
-    const UNIT_DATA = {
-        1: {
-            id: 1,
-            title: "Daily Routines",
-            slug: "daily-routines",
-            tense: "Simple Present",
-            badge: "🌅",
-            description: "Learn how to describe everyday habits, school days, and personal schedules using the Simple Present tense.",
-            reading: [
-                "Every weekday, Mia wakes up at seven o'clock.",
-                "She gets dressed, eats breakfast, and walks to school with her brother.",
-                "In class, Mia listens to her teachers and writes in her notebook.",
-                "After school, she does her homework and helps her mother at home.",
-                "At night, she reads for a few minutes and goes to bed at ten o'clock."
-            ],
-            vocabulary: [
-                { word: "wake up", spanish: "despertarse", definition: "To stop sleeping and become awake.", example: "Mia wakes up at seven o'clock.", icon: "⏰" },
-                { word: "get dressed", spanish: "vestirse", definition: "To put on your clothes.", example: "She gets dressed before breakfast.", icon: "👕" },
-                { word: "breakfast", spanish: "desayuno", definition: "The first meal of the day.", example: "Mia eats breakfast at home.", icon: "🥣" },
-                { word: "walk", spanish: "caminar", definition: "To move on foot.", example: "She walks to school with her brother.", icon: "🚶‍♀️" },
-                { word: "homework", spanish: "tarea", definition: "School work completed at home.", example: "She does her homework after school.", icon: "📚" },
-                { word: "go to bed", spanish: "irse a dormir", definition: "To go to your bed to sleep.", example: "Mia goes to bed at ten o'clock.", icon: "🛏️" }
-            ],
-            grammar: {
-                title: "Simple Present: Daily Routines & Habits",
-                explanation: "Use the Simple Present tense to talk about habits, repeated daily routines, or facts. Remember to add '-s' or '-es' to the action verb when the subject is he, she, or it (3rd person singular).",
-                colorCodeTitle: "Simple Present Grammar Structure:",
-                formula: [
-                    { text: "Mia", role: "subject", desc: "Subject (She)" },
-                    { text: "walks", role: "verb", desc: "Verb (+s for She)" },
-                    { text: "to school every day.", role: "complement", desc: "Complement / Habit" }
-                ],
-                examples: [
-                    { subject: "I", verb: "wake up", complement: "at seven o'clock every morning." },
-                    { subject: "Mia", verb: "eats", complement: "healthy breakfast at home." },
-                    { subject: "She", verb: "walks", complement: "to school with her brother." },
-                    { subject: "We", verb: "do", complement: "our English homework together." }
-                ]
-            },
-            comprehension: [
-                { id: 1, question: "What time does Mia wake up?", options: ["At seven o'clock", "At eight o'clock", "At nine o'clock"], correct: "At seven o'clock", hint: "Check the first sentence of the story." },
-                { id: 2, question: "Who walks to school with Mia?", options: ["Her brother", "Her cousin", "Her teacher"], correct: "Her brother", hint: "Look at the second sentence." },
-                { id: 3, question: "What does Mia write in during class?", options: ["Her notebook", "A newspaper", "A comic book"], correct: "Her notebook", hint: "Look for the verb 'writes'." },
-                { id: 4, question: "What does she do after school?", options: ["She does her homework", "She goes shopping", "She plays video games"], correct: "She does her homework", hint: "Read sentence number 4." },
-                { id: 5, question: "What time does Mia go to bed?", options: ["At ten o'clock", "At nine o'clock", "At eleven o'clock"], correct: "At ten o'clock", hint: "Read the final sentence." }
-            ],
-            sentenceBuilder: [
-                "Mia / wakes up / at seven o'clock.",
-                "She / eats / breakfast at home.",
-                "Mia / walks / to school.",
-                "She / does / her homework.",
-                "She / goes / to bed at ten o'clock."
-            ],
-            finalPractice: [
-                { id: 1, text: "Mia _____ up at seven o'clock.", gap: "wakes", choices: ["wakes", "wake", "woke"] },
-                { id: 2, text: "She _____ breakfast at home every morning.", gap: "eats", choices: ["eats", "eat", "ate"] },
-                { id: 3, text: "Mia and her brother _____ to school together.", gap: "walk", choices: ["walk", "walks", "walked"] },
-                { id: 4, text: "She _____ her homework after school.", gap: "does", choices: ["does", "do", "did"] },
-                { id: 5, text: "She _____ to bed at ten o'clock.", gap: "goes", choices: ["goes", "go", "went"] }
-            ],
-            personalPractice: {
-                speaking: [
-                    "What time do you usually wake up on school days?",
-                    "What do you like to eat for breakfast?",
-                    "How do you usually go to school or work?",
-                    "What do you do when you finish your homework or work?",
-                    "Describe your evening routine from dinner until bed."
-                ],
-                writing: [
-                    "Write 3 sentences about what you do every morning.",
-                    "Write 2 sentences about how you study English.",
-                    "Describe your complete daily routine in 5–8 sentences."
-                ],
-                model: "Every day, I wake up at 7:00 AM. I drink water and eat breakfast. Then I study English and walk to school."
-            }
-        },
-        2: {
-            id: 2,
-            title: "A Busy Weekend",
-            slug: "a-busy-weekend",
-            tense: "Past Simple — Regular Verbs",
-            badge: "🏡",
-            description: "Practice describing completed actions from the past using regular past tense verbs ending in -ed.",
-            reading: [
-                "Last weekend, Daniel stayed at home with his family.",
-                "On Saturday morning, he cleaned his bedroom and organized his school materials.",
-                "Later, he helped his father, washed the car, and prepared sandwiches for lunch.",
-                "In the afternoon, Daniel visited his grandmother and watched a movie with her.",
-                "He enjoyed the weekend because he completed many useful activities."
-            ],
-            vocabulary: [
-                { word: "stayed", spanish: "se quedó", definition: "Remained in a place.", example: "Daniel stayed at home.", icon: "🏠" },
-                { word: "cleaned", spanish: "limpió", definition: "Removed dirt or made a place tidy.", example: "He cleaned his bedroom.", icon: "🧹" },
-                { word: "organized", spanish: "organizó", definition: "Put things in a clear order.", example: "He organized his materials.", icon: "🗂️" },
-                { word: "helped", spanish: "ayudó", definition: "Gave assistance to someone.", example: "He helped his father.", icon: "🤝" },
-                { word: "visited", spanish: "visitó", definition: "Went to see a person or place.", example: "Daniel visited his grandmother.", icon: "👵" },
-                { word: "enjoyed", spanish: "disfrutó", definition: "Had a good time doing something.", example: "He enjoyed the weekend.", icon: "😊" }
-            ],
-            grammar: {
-                title: "Past Simple: Regular Verbs (-ed)",
-                explanation: "Use the Past Simple tense for actions that started and finished in the past. Regular verbs form the past tense by adding '-ed' (or just '-d' if the verb ends in 'e').",
-                colorCodeTitle: "Past Simple Regular Verb Formula:",
-                formula: [
-                    { text: "Daniel", role: "subject", desc: "Subject" },
-                    { text: "cleaned", role: "verb", desc: "Regular Verb (+ed)" },
-                    { text: "his bedroom on Saturday.", role: "complement", desc: "Past Action / Time" }
-                ],
-                examples: [
-                    { subject: "Daniel", verb: "cleaned", complement: "his bedroom on Saturday morning." },
-                    { subject: "He", verb: "helped", complement: "his father wash the family car." },
-                    { subject: "Daniel", verb: "visited", complement: "his grandmother in the afternoon." },
-                    { subject: "They", verb: "watched", complement: "a nice movie together." }
-                ]
-            },
-            comprehension: [
-                { id: 1, question: "Where did Daniel stay last weekend?", options: ["At home", "At school", "At a hotel"], correct: "At home", hint: "Read sentence number 1." },
-                { id: 2, question: "What did Daniel clean on Saturday morning?", options: ["His bedroom", "The kitchen", "The garden"], correct: "His bedroom", hint: "Look for 'cleaned'." },
-                { id: 3, question: "Who did Daniel help?", options: ["His father", "His teacher", "His neighbor"], correct: "His father", hint: "Look at sentence 3." },
-                { id: 4, question: "Who did Daniel visit in the afternoon?", options: ["His grandmother", "His cousin", "His friend"], correct: "His grandmother", hint: "Check sentence 4." },
-                { id: 5, question: "Why did Daniel enjoy his weekend?", options: ["He completed many useful activities", "He bought a new game", "He traveled abroad"], correct: "He completed many useful activities", hint: "Read the final sentence." }
-            ],
-            sentenceBuilder: [
-                "Daniel / stayed / at home.",
-                "He / cleaned / his bedroom.",
-                "He / helped / his father.",
-                "Daniel / visited / his grandmother.",
-                "They / watched / a movie."
-            ],
-            finalPractice: [
-                { id: 1, text: "Daniel _____ at home last weekend.", gap: "stayed", choices: ["stayed", "stay", "stays"] },
-                { id: 2, text: "He _____ his bedroom on Saturday morning.", gap: "cleaned", choices: ["cleaned", "cleans", "clean"] },
-                { id: 3, text: "He _____ his father with the car.", gap: "helped", choices: ["helped", "helps", "help"] },
-                { id: 4, text: "Daniel _____ his grandmother.", gap: "visited", choices: ["visited", "visits", "visit"] },
-                { id: 5, text: "They _____ a funny movie together.", gap: "watched", choices: ["watched", "watch", "watches"] }
-            ],
-            personalPractice: {
-                speaking: [
-                    "What did you do last Saturday morning?",
-                    "Did you clean your room or help at home last weekend?",
-                    "Who did you visit or talk to last weekend?",
-                    "What movies or videos did you watch?",
-                    "Tell a classmate about your favorite part of last weekend."
-                ],
-                writing: [
-                    "Write 3 sentences about what you cleaned or organized recently.",
-                    "Write 3 sentences about how you helped someone last week.",
-                    "Describe your last weekend in 5–8 sentences using regular past verbs."
-                ],
-                model: "Last weekend, I stayed at home. I cleaned my room and washed the dishes. In the afternoon, I visited my friend and watched a movie."
-            }
-        },
-        3: {
-            id: 3,
-            title: "Emma's Trip to the Zoo",
-            slug: "emmas-trip-to-the-zoo",
-            tense: "Past Simple — Irregular Verbs",
-            badge: "🦁",
-            description: "Master common irregular past tense verbs (went, saw, took, ate, wrote) with Emma's zoo story.",
-            reading: [
-                "Last Sunday, Emma went to the zoo with her parents.",
-                "They saw lions, monkeys, elephants, and a very tall giraffe.",
-                "Emma took many pictures and gave some food to the animals in a special area.",
-                "At noon, the family ate sandwiches and drank cold water.",
-                "Emma had a wonderful day and wrote about the trip in her notebook."
-            ],
-            vocabulary: [
-                { word: "went", spanish: "fue", definition: "Past form of go.", example: "Emma went to the zoo.", icon: "🚌" },
-                { word: "saw", spanish: "vio", definition: "Past form of see.", example: "They saw many animals.", icon: "👀" },
-                { word: "took", spanish: "tomó", definition: "Past form of take.", example: "Emma took many pictures.", icon: "📸" },
-                { word: "gave", spanish: "dio", definition: "Past form of give.", example: "She gave food to the animals.", icon: "🥕" },
-                { word: "ate", spanish: "comió", definition: "Past form of eat.", example: "The family ate sandwiches.", icon: "🥪" },
-                { word: "wrote", spanish: "escribió", definition: "Past form of write.", example: "Emma wrote about the trip.", icon: "✍️" }
-            ],
-            grammar: {
-                title: "Past Simple: Irregular Verbs",
-                explanation: "Irregular verbs do not follow the '-ed' rule. Their past forms change completely and must be learned through practice (e.g., go → went, see → saw, eat → ate).",
-                colorCodeTitle: "Past Simple Irregular Structure:",
-                formula: [
-                    { text: "Emma", role: "subject", desc: "Subject" },
-                    { text: "went", role: "verb", desc: "Irregular Past Verb (go → went)" },
-                    { text: "to the zoo last Sunday.", role: "complement", desc: "Complement / Time" }
-                ],
-                examples: [
-                    { subject: "Emma", verb: "went", complement: "to the zoo with her parents." },
-                    { subject: "They", verb: "saw", complement: "lions, monkeys, and elephants." },
-                    { subject: "She", verb: "took", complement: "many pictures with her phone." },
-                    { subject: "The family", verb: "ate", complement: "delicious sandwiches at noon." }
-                ]
-            },
-            comprehension: [
-                { id: 1, question: "Where did Emma go last Sunday?", options: ["To the zoo", "To the beach", "To the museum"], correct: "To the zoo", hint: "Read sentence 1." },
-                { id: 2, question: "What animals did they see at the zoo?", options: ["Lions, monkeys, elephants, and a giraffe", "Dolphins and sharks", "Only horses and cows"], correct: "Lions, monkeys, elephants, and a giraffe", hint: "Check sentence 2." },
-                { id: 3, question: "What did Emma take?", options: ["Many pictures", "A bicycle", "A test"], correct: "Many pictures", hint: "Look for 'took'." },
-                { id: 4, question: "What did the family eat at noon?", options: ["Sandwiches", "Pizza", "Salad"], correct: "Sandwiches", hint: "Look for 'ate'." },
-                { id: 5, question: "Where did Emma write about the trip?", options: ["In her notebook", "On a computer", "In a letter"], correct: "In her notebook", hint: "Check sentence 5." }
-            ],
-            sentenceBuilder: [
-                "Emma / went / to the zoo.",
-                "They / saw / many animals.",
-                "Emma / took / many pictures.",
-                "The family / ate / sandwiches.",
-                "Emma / wrote / in her notebook."
-            ],
-            finalPractice: [
-                { id: 1, text: "Emma _____ to the zoo last Sunday.", gap: "went", choices: ["went", "go", "goed"] },
-                { id: 2, text: "They _____ many wild animals.", gap: "saw", choices: ["saw", "see", "seen"] },
-                { id: 3, text: "Emma _____ many beautiful pictures.", gap: "took", choices: ["took", "take", "taked"] },
-                { id: 4, text: "The family _____ sandwiches for lunch.", gap: "ate", choices: ["ate", "eat", "eated"] },
-                { id: 5, text: "Emma _____ about her trip in her notebook.", gap: "wrote", choices: ["wrote", "write", "writed"] }
-            ],
-            personalPractice: {
-                speaking: [
-                    "When did you last visit a zoo, park, or museum?",
-                    "What interesting things did you see there?",
-                    "What foods did you eat on your last trip?",
-                    "Did you take photos? What did you photograph?",
-                    "Describe a memorable trip you took with your family or friends."
-                ],
-                writing: [
-                    "Write 3 sentences about a trip you went on.",
-                    "List 3 irregular past verbs and write a sentence for each.",
-                    "Write a 5–8 sentence story about a special trip in the past."
-                ],
-                model: "Last month, I went to a big park with my family. We saw colorful birds and tall trees. I took many photos and ate ice cream."
-            }
-        },
-        4: {
-            id: 4,
-            title: "Leo's Future Dreams",
-            slug: "leos-future-dreams",
-            tense: "Future with WILL",
-            badge: "🚀",
-            description: "Learn how to talk about future goals, predictions, and plans using the modal auxiliary verb WILL.",
-            reading: [
-                "Leo has many dreams for his future.",
-                "He will study science because he wants to understand the universe.",
-                "He will travel to different countries and will meet people from many cultures.",
-                "Leo will also help his community and will protect the environment.",
-                "He knows that he will work hard, but he believes his future will be exciting."
-            ],
-            vocabulary: [
-                { word: "future", spanish: "futuro", definition: "The time that comes after the present.", example: "Leo thinks about his future.", icon: "🔮" },
-                { word: "dream", spanish: "sueño / meta", definition: "A goal or wish you strongly hope to achieve.", example: "Leo has an important dream.", icon: "🌟" },
-                { word: "study", spanish: "estudiar", definition: "To learn about an academic subject.", example: "He will study science.", icon: "🔬" },
-                { word: "travel", spanish: "viajar", definition: "To go from one place or country to another.", example: "He will travel to different countries.", icon: "✈️" },
-                { word: "community", spanish: "comunidad", definition: "The group of people living in the same area.", example: "Leo will help his community.", icon: "🏘️" },
-                { word: "protect", spanish: "proteger", definition: "To keep someone or something safe from harm.", example: "He will protect the environment.", icon: "🌳" }
-            ],
-            grammar: {
-                title: "Future Tense with WILL",
-                explanation: "Use 'will' + base verb to talk about future predictions, promises, decisions, and dreams. 'Will' never changes regardless of the subject (I will, she will, they will).",
-                colorCodeTitle: "Future with WILL Structure:",
-                formula: [
-                    { text: "Leo", role: "subject", desc: "Subject" },
-                    { text: "will study", role: "verb", desc: "will + Base Verb" },
-                    { text: "science in the future.", role: "complement", desc: "Future Plan / Complement" }
-                ],
-                examples: [
-                    { subject: "Leo", verb: "will study", complement: "science at university." },
-                    { subject: "He", verb: "will travel", complement: "to many different countries." },
-                    { subject: "Leo", verb: "will help", complement: "protect the local environment." },
-                    { subject: "His future", verb: "will be", complement: "very exciting and bright." }
-                ]
-            },
-            comprehension: [
-                { id: 1, question: "What will Leo study in the future?", options: ["Science", "Music", "Art"], correct: "Science", hint: "Read sentence 2." },
-                { id: 2, question: "Why will Leo study science?", options: ["To understand the universe", "To play video games", "To win a medal"], correct: "To understand the universe", hint: "Look at sentence 2 after 'because'." },
-                { id: 3, question: "What will Leo do in different countries?", options: ["Meet people from many cultures", "Stay in his hotel room", "Sell old cars"], correct: "Meet people from many cultures", hint: "Read sentence 3." },
-                { id: 4, question: "What will Leo protect?", options: ["The environment", "His computer", "A secret castle"], correct: "The environment", hint: "Read sentence 4." },
-                { id: 5, question: "How does Leo believe his future will be?", options: ["Exciting", "Boring", "Difficult"], correct: "Exciting", hint: "Check the final word of the text." }
-            ],
-            sentenceBuilder: [
-                "Leo / will study / science.",
-                "He / will travel / to different countries.",
-                "Leo / will meet / new people.",
-                "He / will help / his community.",
-                "His future / will be / exciting."
-            ],
-            finalPractice: [
-                { id: 1, text: "Leo _____ study science in university.", gap: "will", choices: ["will", "did", "does"] },
-                { id: 2, text: "He will _____ to many foreign countries.", gap: "travel", choices: ["travel", "traveled", "travels"] },
-                { id: 3, text: "Leo _____ meet people from new cultures.", gap: "will", choices: ["will", "is", "was"] },
-                { id: 4, text: "He will _____ his local community.", gap: "help", choices: ["help", "helped", "helps"] },
-                { id: 5, text: "His future will _____ bright and exciting.", gap: "be", choices: ["be", "is", "was"] }
-            ],
-            personalPractice: {
-                speaking: [
-                    "What subject will you study in the future?",
-                    "What job or career will you choose?",
-                    "Which country will you visit one day?",
-                    "How will you help your community or family in the future?",
-                    "Describe your future life in 10 years."
-                ],
-                writing: [
-                    "Write 3 sentences about your future job or study plans.",
-                    "Write 2 sentences about places you will visit.",
-                    "Write 5–8 sentences about your future dreams using 'will'."
-                ],
-                model: "In the future, I will study technology. I will travel to Japan and meet new friends. I will also build helpful programs for my community."
-            }
+const SequenceOrderingQuestion = ({ currentOrder, onMoveUp, onMoveDown }) => {
+  return (
+    <div className="my-4 flex flex-col gap-3">
+      <p className="text-xs sm:text-sm text-teal-900 font-bold mb-1 text-center bg-teal-100 py-1.5 px-4 rounded-full inline-block border border-teal-200">
+        Use arrows to arrange the events in order from 1 to 3!
+      </p>
+
+      {currentOrder.map((item, index) => (
+        <div
+          key={item.id}
+          className="flex items-center gap-3 p-4 bg-white border-3 border-teal-200 rounded-2xl shadow-sm hover:shadow-md transition-all"
+        >
+          <div className="w-10 h-10 rounded-full bg-teal-600 text-white font-black text-xl flex items-center justify-center shrink-0 shadow-xs">
+            {index + 1}
+          </div>
+          <div className="flex-1 text-slate-800 font-bold text-lg leading-snug">
+            {item.text}
+          </div>
+          <div className="flex flex-col gap-1 shrink-0">
+            <button
+              disabled={index === 0}
+              onClick={() => {
+                playSoundEffect('pop');
+                onMoveUp(index);
+              }}
+              className="p-1.5 rounded-lg bg-slate-100 hover:bg-teal-100 disabled:opacity-30 disabled:hover:bg-slate-100 text-slate-700 cursor-pointer"
+            >
+              <ChevronUp className="w-5 h-5" />
+            </button>
+            <button
+              disabled={index === currentOrder.length - 1}
+              onClick={() => {
+                playSoundEffect('pop');
+                onMoveDown(index);
+              }}
+              className="p-1.5 rounded-lg bg-slate-100 hover:bg-teal-100 disabled:opacity-30 disabled:hover:bg-slate-100 text-slate-700 cursor-pointer"
+            >
+              <ChevronDown className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const TextMultipleChoiceQuestion = ({ question, selectedOption, onSelect }) => {
+  return (
+    <div className="flex flex-col gap-3 my-4">
+      {question.passageContext && (
+        <div className="p-3 bg-amber-50 border-l-4 border-amber-400 rounded-r-xl italic text-slate-800 text-base font-medium mb-2">
+          {question.passageContext}
+        </div>
+      )}
+      {question.options.map((opt) => {
+        const isSelected = selectedOption === opt.id;
+        return (
+          <button
+            key={opt.id}
+            onClick={() => {
+              playSoundEffect('pop');
+              onSelect(opt.id);
+            }}
+            className={`p-4 rounded-2xl border-3 text-left transition-all duration-200 cursor-pointer flex items-start gap-3 ${
+              isSelected
+                ? 'bg-sky-100 border-sky-500 text-sky-950 font-black shadow-md scale-101'
+                : 'bg-white border-slate-200 hover:border-sky-300 text-slate-800 font-bold shadow-xs'
+            }`}
+          >
+            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mt-0.5 shrink-0 ${
+              isSelected ? 'border-sky-600 bg-sky-500 text-white' : 'border-slate-300'
+            }`}>
+              {isSelected && <span className="text-xs font-bold">✓</span>}
+            </div>
+            <span className="text-lg leading-snug">{opt.text}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
+export default function App() {
+  const [currentScreen, setCurrentScreen] = useState('welcome');
+  const [studentName, setStudentName] = useState('');
+  const [selectedLevelId, setSelectedLevelId] = useState('A1');
+  const [currentQuestionIdx, setCurrentQuestionIdx] = useState(0);
+  
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+
+  const [userAnswers, setUserAnswers] = useState({});
+  const [sequenceOrders, setSequenceOrders] = useState({});
+  const [matchingPairs, setMatchingPairs] = useState({});
+
+  const [feedback, setFeedback] = useState(null);
+
+  const speakText = (text, isSlow = false) => {
+    if (!('speechSynthesis' in window)) return;
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    // Slower speech rate for young ESL children reading word by word
+    utterance.rate = isSlow || selectedLevelId === 'A1' ? 0.75 : 0.85; 
+    utterance.pitch = 1.1;
+
+    utterance.onstart = () => setIsPlayingAudio(true);
+    utterance.onend = () => setIsPlayingAudio(false);
+    utterance.onerror = () => setIsPlayingAudio(false);
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const stopAudio = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsPlayingAudio(false);
+  };
+
+  const currentLevelData = READ_ASSESSMENT_DATA[selectedLevelId];
+  const currentQuestion = currentLevelData?.questions[currentQuestionIdx];
+
+  useEffect(() => {
+    if (currentQuestion?.type === 'sequence' && !sequenceOrders[currentQuestion.id]) {
+      setSequenceOrders(prev => ({
+        ...prev,
+        [currentQuestion.id]: [...currentQuestion.items]
+      }));
+    }
+  }, [currentQuestionIdx, selectedLevelId]);
+
+  const handleStartAssessment = (levelId) => {
+    playSoundEffect('pop');
+    setSelectedLevelId(levelId);
+    setCurrentQuestionIdx(0);
+    setUserAnswers({});
+    setFeedback(null);
+    setCurrentScreen('assessment');
+  };
+
+  const handleCheckAnswer = () => {
+    if (!currentQuestion) return;
+
+    let isCorrect = false;
+
+    if (currentQuestion.type === 'multiple_choice_image' || currentQuestion.type === 'multiple_choice_text' || currentQuestion.type === 'context_vocabulary') {
+      const selectedId = userAnswers[currentQuestion.id];
+      const correctOpt = currentQuestion.options.find(o => o.isCorrect);
+      isCorrect = selectedId === correctOpt?.id;
+    } else if (currentQuestion.type === 'true_false') {
+      const val = userAnswers[currentQuestion.id];
+      isCorrect = val === currentQuestion.correctValue;
+    } else if (currentQuestion.type === 'matching') {
+      const matches = matchingPairs[currentQuestion.id] || {};
+      const totalPairs = currentQuestion.pairs.length;
+      let correctMatches = 0;
+      currentQuestion.pairs.forEach(p => {
+        if (matches[p.id] === p.id) {
+          correctMatches++;
         }
-    };
-
-    const VERB_LIST = [
-        // Regular Verbs
-        { pres: "answer", past: "answered", future: "will answer", spanish: "responder", type: "regular", exp: "I answer the teacher's question." },
-        { pres: "arrive", past: "arrived", future: "will arrive", spanish: "llegar", type: "regular", exp: "The bus arrived on time." },
-        { pres: "ask", past: "asked", future: "will ask", spanish: "preguntar", type: "regular", exp: "She asked a good question." },
-        { pres: "call", past: "called", future: "will call", spanish: "llamar", type: "regular", exp: "I will call my grandmother." },
-        { pres: "clean", past: "cleaned", future: "will clean", spanish: "limpiar", type: "regular", exp: "Daniel cleaned his bedroom." },
-        { pres: "cook", past: "cooked", future: "will cook", spanish: "cocinar", type: "regular", exp: "They cooked lunch together." },
-        { pres: "dance", past: "danced", future: "will dance", spanish: "bailar", type: "regular", exp: "We danced at the festival." },
-        { pres: "enjoy", past: "enjoyed", future: "will enjoy", spanish: "disfrutar", type: "regular", exp: "He enjoyed his trip." },
-        { pres: "help", past: "helped", future: "will help", spanish: "ayudar", type: "regular", exp: "Leo will help his community." },
-        { pres: "invite", past: "invited", future: "will invite", spanish: "invitar", type: "regular", exp: "She invited her friends." },
-        { pres: "listen", past: "listened", future: "will listen", spanish: "escuchar", type: "regular", exp: "Mia listens carefully." },
-        { pres: "live", past: "lived", future: "will live", spanish: "vivir", type: "regular", exp: "They live in a quiet town." },
-        { pres: "look", past: "looked", future: "will look", spanish: "mirar", type: "regular", exp: "Look at the high mountain." },
-        { pres: "need", past: "needed", future: "will need", spanish: "necesitar", type: "regular", exp: "I need a new notebook." },
-        { pres: "open", past: "opened", future: "will open", spanish: "abrir", type: "regular", exp: "Please open your workbook." },
-        { pres: "organize", past: "organized", future: "will organize", spanish: "organizar", type: "regular", exp: "He organized his desk." },
-        { pres: "play", past: "played", future: "will play", spanish: "jugar", type: "regular", exp: "They play soccer on Fridays." },
-        { pres: "practice", past: "practiced", future: "will practice", spanish: "practicar", type: "regular", exp: "We practice English every day." },
-        { pres: "study", past: "studied", future: "will study", spanish: "estudiar", type: "regular", exp: "Leo will study science." },
-        { pres: "travel", past: "traveled", future: "will travel", spanish: "viajar", type: "regular", exp: "He will travel to Asia." },
-        { pres: "visit", past: "visited", future: "will visit", spanish: "visitar", type: "regular", exp: "Daniel visited his grandmother." },
-        { pres: "wait", past: "waited", future: "will wait", spanish: "esperar", type: "regular", exp: "We waited for ten minutes." },
-        { pres: "walk", past: "walked", future: "will walk", spanish: "caminar", type: "regular", exp: "Mia walks to school." },
-        { pres: "wash", past: "washed", future: "will wash", spanish: "lavar", type: "regular", exp: "He washed the car." },
-        { pres: "watch", past: "watched", future: "will watch", spanish: "ver / mirar", type: "regular", exp: "They watched a movie." },
-        { pres: "work", past: "worked", future: "will work", spanish: "trabajar", type: "regular", exp: "Leo will work hard." },
-
-        // Irregular Verbs
-        { pres: "be", past: "was / were", future: "will be", spanish: "ser / estar", type: "irregular", exp: "His future will be exciting." },
-        { pres: "begin", past: "began", future: "will begin", spanish: "empezar", type: "irregular", exp: "Class began at 8:00 AM." },
-        { pres: "break", past: "broke", future: "will break", spanish: "romper", type: "irregular", exp: "Be careful not to break the cup." },
-        { pres: "bring", past: "brought", future: "will bring", spanish: "traer", type: "irregular", exp: "She brought her textbook." },
-        { pres: "buy", past: "bought", future: "will buy", spanish: "comprar", type: "irregular", exp: "They bought fresh fruits." },
-        { pres: "come", past: "came", future: "will come", spanish: "venir", type: "irregular", exp: "My friend came to my house." },
-        { pres: "do", past: "did", future: "will do", spanish: "hacer", type: "irregular", exp: "Mia does her homework." },
-        { pres: "drink", past: "drank", future: "will drink", spanish: "beber", type: "irregular", exp: "They drank cold water." },
-        { pres: "eat", past: "ate", future: "will eat", spanish: "comer", exp: "The family ate lunch." },
-        { pres: "feel", past: "felt", future: "will feel", spanish: "sentir", type: "irregular", exp: "Emma felt very happy." },
-        { pres: "find", past: "found", future: "will find", spanish: "encontrar", type: "irregular", exp: "I found my lost pen." },
-        { pres: "get", past: "got", future: "will get", spanish: "obtener / llegar", type: "irregular", exp: "She gets dressed quickly." },
-        { pres: "give", past: "gave", future: "will give", spanish: "dar", type: "irregular", exp: "Emma gave food to animals." },
-        { pres: "go", past: "went", future: "will go", spanish: "ir", type: "irregular", exp: "Emma went to the zoo." },
-        { pres: "have", past: "had", future: "will have", spanish: "tener", type: "irregular", exp: "Leo has many big dreams." },
-        { pres: "know", past: "knew", future: "will know", spanish: "saber / conocer", type: "irregular", exp: "I know the right answer." },
-        { pres: "make", past: "made", future: "will make", spanish: "hacer / fabricar", type: "irregular", exp: "She made a sandwich." },
-        { pres: "meet", past: "met", future: "will meet", spanish: "conocer / reunirse", type: "irregular", exp: "Leo will meet new people." },
-        { pres: "read", past: "read", future: "will read", spanish: "leer", type: "irregular", exp: "Mia reads every night." },
-        { pres: "run", past: "ran", future: "will run", spanish: "correr", type: "irregular", exp: "He ran fast in the park." },
-        { pres: "say", past: "said", future: "will say", spanish: "decir", type: "irregular", exp: "She said hello to us." },
-        { pres: "see", past: "saw", future: "will see", spanish: "ver", type: "irregular", exp: "They saw a giraffe." },
-        { pres: "speak", past: "spoke", future: "will speak", spanish: "hablar", type: "irregular", exp: "We speak English in class." },
-        { pres: "take", past: "took", future: "will take", spanish: "tomar / llevar", type: "irregular", exp: "Emma took pictures." },
-        { pres: "teach", past: "taught", future: "will teach", spanish: "enseñar", type: "irregular", exp: "Our teacher taught grammar." },
-        { pres: "think", past: "thought", future: "will think", spanish: "pensar", type: "irregular", exp: "Think before you write." },
-        { pres: "understand", past: "understood", future: "will understand", spanish: "entender", type: "irregular", exp: "I understand this lesson." },
-        { pres: "write", past: "wrote", future: "will write", spanish: "escribir", type: "irregular", exp: "Emma wrote in her journal." }
-    ];
-
-    const AppState = {
-        currentRoute: 'home',
-        currentUnitId: 1,
-        activeTab: 'reading', // reading, vocabulary, grammar, comprehension, sentenceBuilder, gapFill, oralPractice
-        preferences: {
-            fontSize: '19px',
-            lineSpacing: '1.8',
-            wordSpacing: '0.18em',
-            fontFamily: "'Comic Neue', sans-serif",
-            highContrast: false,
-            focusMode: false,
-            speechRate: 0.9,
-            colorCoding: true
-        },
-        progress: JSON.parse(localStorage.getItem('readbridge_progress') || '{}'),
-        studentNotes: JSON.parse(localStorage.getItem('readbridge_notes') || '{}')
-    };
-
-    function saveProgress() {
-        localStorage.setItem('readbridge_progress', JSON.stringify(AppState.progress));
+      });
+      isCorrect = correctMatches === totalPairs;
+    } else if (currentQuestion.type === 'sequence') {
+      const order = sequenceOrders[currentQuestion.id] || [];
+      isCorrect = order.every((item, idx) => item.correctOrder === idx + 1);
     }
 
-    function saveNotes() {
-        localStorage.setItem('readbridge_notes', JSON.stringify(AppState.studentNotes));
+    if (isCorrect) {
+      playSoundEffect('success');
+      setFeedback({ isCorrect: true, message: 'Great job! That is correct! 🎉' });
+    } else {
+      playSoundEffect('error');
+      setFeedback({ isCorrect: false, message: 'Not quite! Read the story again carefully. 🌊' });
     }
+  };
 
-    const SpeechEngine = {
-        synth: window.speechSynthesis,
-        speaking: false,
-        
-        speak(text, onEndCallback = null) {
-            if (!this.synth) {
-                alert("Text-to-speech is not supported on this browser.");
-                return;
-            }
-            this.synth.cancel(); // Stop ongoing speech
-
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'en-US';
-            utterance.rate = AppState.preferences.speechRate || 0.9;
-            utterance.pitch = 1.0;
-
-            if (onEndCallback) {
-                utterance.onend = () => {
-                    this.speaking = false;
-                    onEndCallback();
-                };
-            }
-
-            this.speaking = true;
-            this.synth.speak(utterance);
-        },
-
-        stop() {
-            if (this.synth) {
-                this.synth.cancel();
-                this.speaking = false;
-            }
-        }
-    };
-
-    function updatePreferencesUI() {
-        document.body.style.fontSize = AppState.preferences.fontSize;
-        document.body.style.lineHeight = AppState.preferences.lineSpacing;
-        document.body.style.wordSpacing = AppState.preferences.wordSpacing;
-        document.body.style.fontFamily = AppState.preferences.fontFamily;
-
-        if (AppState.preferences.highContrast) {
-            document.body.classList.add('high-contrast');
-        } else {
-            document.body.classList.remove('high-contrast');
-        }
-
-        if (AppState.preferences.focusMode) {
-            document.body.classList.add('focus-mode');
-        } else {
-            document.body.classList.remove('focus-mode');
-        }
+  const handleNextQuestion = () => {
+    playSoundEffect('pop');
+    setFeedback(null);
+    if (currentQuestionIdx + 1 < currentLevelData.questions.length) {
+      setCurrentQuestionIdx(prev => prev + 1);
+    } else {
+      playSoundEffect('celebrate');
+      setCurrentScreen('results');
     }
+  };
 
-    function navigate() {
-        const hash = window.location.hash.replace('#', '') || 'home';
-        SpeechEngine.stop();
-
-        if (hash.startsWith('unit/')) {
-            const parts = hash.split('/');
-            AppState.currentRoute = 'unit';
-            AppState.currentUnitId = parseInt(parts[1]) || 1;
-            AppState.activeTab = parts[2] || 'reading';
-        } else {
-            AppState.currentRoute = hash;
-        }
-
-        renderApp();
-    }
-
-    window.addEventListener('hashchange', navigate);
-    window.addEventListener('DOMContentLoaded', () => {
-        updatePreferencesUI();
-        navigate();
+  const calculateScore = () => {
+    let score = 0;
+    currentLevelData.questions.forEach((q) => {
+      if (q.type === 'multiple_choice_image' || q.type === 'multiple_choice_text' || q.type === 'context_vocabulary') {
+        const selectedId = userAnswers[q.id];
+        const correctOpt = q.options.find(o => o.isCorrect);
+        if (selectedId === correctOpt?.id) score++;
+      } else if (q.type === 'true_false') {
+        if (userAnswers[q.id] === q.correctValue) score++;
+      } else if (q.type === 'matching') {
+        const matches = matchingPairs[q.id] || {};
+        const isAllCorrect = q.pairs.every(p => matches[p.id] === p.id);
+        if (isAllCorrect) score++;
+      } else if (q.type === 'sequence') {
+        const order = sequenceOrders[q.id] || [];
+        const isSeqCorrect = order.every((item, idx) => item.correctOrder === idx + 1);
+        if (isSeqCorrect) score++;
+      }
     });
+    return score;
+  };
 
-    function renderApp() {
-        const container = document.getElementById('app-container');
-        if (!container) return;
+  const totalQuestions = currentLevelData?.questions.length || 0;
+  const score = calculateScore();
+  const percentage = Math.round((score / (totalQuestions || 1)) * 100);
 
-        updatePreferencesUI();
-
-        switch (AppState.currentRoute) {
-            case 'home':
-                container.innerHTML = renderHomeView();
-                break;
-            case 'unit':
-                container.innerHTML = renderUnitView(AppState.currentUnitId, AppState.activeTab);
-                attachUnitEventListeners();
-                break;
-            case 'verbs':
-                container.innerHTML = renderVerbsView();
-                attachVerbEventListeners();
-                break;
-            case 'progress':
-                container.innerHTML = renderProgressView();
-                break;
-            case 'preferences':
-                container.innerHTML = renderPreferencesView();
-                attachPreferencesEventListeners();
-                break;
-            case 'teacher':
-                container.innerHTML = renderTeacherView();
-                break;
-            default:
-                container.innerHTML = renderHomeView();
-        }
+  const handleMoveSequenceUp = (idx) => {
+    const qId = currentQuestion.id;
+    const currentList = [...(sequenceOrders[qId] || [])];
+    if (idx > 0) {
+      const temp = currentList[idx];
+      currentList[idx] = currentList[idx - 1];
+      currentList[idx - 1] = temp;
+      setSequenceOrders(prev => ({ ...prev, [qId]: currentList }));
     }
+  };
 
-    function renderHomeView() {
-        let unitsHtml = Object.values(UNIT_DATA).map(unit => {
-            const prog = AppState.progress[unit.id] || { quizScore: 0, completed: false };
-            return `
-                <div class="card-theme bg-white rounded-2xl p-6 shadow-sm hover:shadow-md border border-slate-200 transition-all flex flex-col justify-between">
-                    <div>
-                        <div class="flex items-center justify-between mb-3">
-                            <span class="text-4xl">${unit.badge}</span>
-                            <span class="text-xs font-bold px-3 py-1 rounded-full bg-indigo-100 text-indigo-700">
-                                ${unit.tense}
-                            </span>
-                        </div>
-                        <h3 class="text-xl font-bold mb-2 text-slate-800">Unit ${unit.id}: ${unit.title}</h3>
-                        <p class="text-sm text-slate-600 mb-4 leading-relaxed">${unit.description}</p>
-                    </div>
+  const handleMoveSequenceDown = (idx) => {
+    const qId = currentQuestion.id;
+    const currentList = [...(sequenceOrders[qId] || [])];
+    if (idx < currentList.length - 1) {
+      const temp = currentList[idx];
+      currentList[idx] = currentList[idx + 1];
+      currentList[idx + 1] = temp;
+      setSequenceOrders(prev => ({ ...prev, [qId]: currentList }));
+    }
+  };
 
-                    <div class="pt-4 border-t border-slate-100 flex flex-col gap-3">
-                        <div class="flex justify-between items-center text-xs font-semibold text-slate-500">
-                            <span>Status: ${prog.completed ? '✅ Completed' : '⏳ In Progress'}</span>
-                            <span>Score: ${prog.quizScore || 0}%</span>
-                        </div>
-                        <a href="#unit/${unit.id}/reading" class="w-full text-center py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition shadow-sm tap-target flex items-center justify-center gap-2">
-                            <span>Open Unit ${unit.id}</span>
-                            <i class="fa-solid fa-arrow-right text-xs"></i>
-                        </a>
-                    </div>
-                </div>
-            `;
-        }).join('');
+  return (
+    <div className="min-h-screen bg-slate-900 text-slate-800 font-sans flex flex-col justify-between relative overflow-hidden select-none">
+      
+      {/* Background Ocean Gradient */}
+      <div className="fixed inset-0 bg-gradient-to-b from-sky-400 via-blue-600 to-indigo-950 pointer-events-none z-0"></div>
+      <UnderwaterBubbles />
 
-        return `
-            <div class="space-y-8 py-4">
-                <!-- Hero Banner -->
-                <div class="card-theme bg-gradient-to-r from-indigo-900 via-slate-800 to-indigo-950 text-white rounded-3xl p-6 md:p-10 shadow-lg relative overflow-hidden">
-                    <div class="relative z-10 max-w-2xl">
-                        <span class="inline-block px-3 py-1 bg-amber-400 text-slate-900 font-bold text-xs rounded-full mb-3">
-                            A1–A2 English Workbook Companion
-                        </span>
-                        <h2 class="text-3xl sm:text-4xl font-extrabold mb-3 text-amber-300">
-                            Build Your Reading Bridge Today
-                        </h2>
-                        <p class="text-slate-200 text-base sm:text-lg mb-6 leading-relaxed">
-                            Interactive reading stories, audio pronunciation, color-coded grammar, interactive sentence builders, and speech practice designed for clear learning.
-                        </p>
-                        <div class="flex flex-wrap gap-3">
-                            <a href="#unit/1/reading" class="px-5 py-3 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold rounded-xl shadow-md transition flex items-center gap-2 tap-target">
-                                <i class="fa-solid fa-play"></i> Start Unit 1
-                            </a>
-                            <a href="#verbs" class="px-5 py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl border border-slate-600 transition flex items-center gap-2 tap-target">
-                                <i class="fa-solid fa-book-open"></i> Verb Dictionary
-                            </a>
-                        </div>
-                    </div>
-                </div>
+      {/* Header Bar */}
+      <header className="relative z-10 bg-white/10 backdrop-blur-md border-b border-white/20 px-4 py-3 flex items-center justify-between text-white shadow-md">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-amber-400 text-amber-950 flex items-center justify-center text-2xl shadow-md font-bold">
+            🌊
+          </div>
+          <div>
+            <h1 className="font-black text-xl sm:text-2xl tracking-tight drop-shadow-xs">
+              Ocean Reading Assessment
+            </h1>
+            <p className="text-xs text-sky-100 font-medium">Adapted for CEFR A1 & A2 (Aged 10)</p>
+          </div>
+        </div>
 
-                <!-- Units Grid -->
-                <div>
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-2xl font-bold text-slate-800">Workbook Units</h2>
-                        <span class="text-sm text-slate-500 font-medium">4 Interactive Lessons</span>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        ${unitsHtml}
-                    </div>
-                </div>
+        {studentName && (
+          <div className="flex items-center gap-2 bg-white/20 px-3.5 py-1.5 rounded-full border border-white/30 text-sm font-bold">
+            <User className="w-4 h-4 text-amber-300" />
+            <span>{studentName}</span>
+          </div>
+        )}
+      </header>
 
-                <!-- Features Highlights -->
-                <div class="card-theme bg-amber-50/70 border border-amber-200 rounded-2xl p-6">
-                    <h3 class="text-lg font-bold mb-3 text-amber-900 flex items-center gap-2">
-                        <i class="fa-solid fa-wand-magic-sparkles text-amber-600"></i> Interactive Learning Tools Included
-                    </h3>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-slate-700">
-                        <div class="flex items-start gap-3">
-                            <span class="text-2xl">🗣️</span>
-                            <div>
-                                <strong>Text-to-Speech:</strong> Click any sentence or vocabulary word to hear natural English pronunciation.
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-3">
-                            <span class="text-2xl">🎨</span>
-                            <div>
-                                <strong>Grammar Color Coding:</strong> Visual cues for <span class="token-subject">Subject</span>, <span class="token-verb">Verb</span>, and <span class="token-complement">Complement</span>.
-                            </div>
-                        </div>
-                        <div class="flex items-start gap-3">
-                            <span class="text-2xl">🎙️</span>
-                            <div>
-                                <strong>Oral & Writing Practice:</strong> Microphone recording feedback and personal sentence builder.
-                            </div>
-                        </div>
-                    </div>
-                </div>
+      {/* SCREEN 1: WELCOME */}
+      {currentScreen === 'welcome' && (
+        <main className="relative z-10 max-w-4xl mx-auto px-4 py-8 flex-1 flex flex-col justify-center items-center text-center">
+          <div className="bg-white/95 backdrop-blur-lg rounded-3xl p-6 sm:p-10 shadow-2xl border-4 border-sky-200 w-full max-w-2xl transform transition-all">
+            
+            <div className="inline-block p-4 bg-sky-100 rounded-full mb-4 shadow-inner">
+              <span className="text-6xl animate-bounce inline-block">🐬</span>
             </div>
-        `;
-    }
 
-    function renderUnitView(unitId, activeTab) {
-        const unit = UNIT_DATA[unitId];
-        if (!unit) return `<div class="p-8 text-center text-red-600">Unit not found.</div>`;
+            <h2 className="text-3xl sm:text-4xl font-black text-sky-950 mb-2">
+              Marine Life Reading Quest 🐠
+            </h2>
+            <p className="text-slate-600 text-lg font-bold mb-6">
+              Short, clear stories tailored for 10-year-old English learners!
+            </p>
 
-        const tabs = [
-            { id: 'reading', label: '📖 Reading & Audio', icon: 'fa-book-open' },
-            { id: 'vocabulary', label: '🎴 Vocabulary', icon: 'fa-layer-group' },
-            { id: 'grammar', label: '📐 Grammar', icon: 'fa-diagram-project' },
-            { id: 'comprehension', label: '❓ Quiz', icon: 'fa-circle-question' },
-            { id: 'sentenceBuilder', label: '🧩 Sentence Builder', icon: 'fa-cubes' },
-            { id: 'gapFill', label: '✏️ Gap Fill', icon: 'fa-pen-to-square' },
-            { id: 'oralPractice', label: '🎙️ Oral & Writing', icon: 'fa-microphone' }
-        ];
-
-        const tabsNav = tabs.map(tab => {
-            const isActive = tab.id === activeTab;
-            return `
-                <a href="#unit/${unitId}/${tab.id}" class="px-3.5 py-2.5 rounded-xl font-bold text-sm transition-all whitespace-nowrap flex items-center gap-2 tap-target ${
-                    isActive 
-                    ? 'bg-indigo-600 text-white shadow-sm' 
-                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-                }">
-                    ${tab.label}
-                </a>
-            `;
-        }).join('');
-
-        let contentHtml = '';
-        switch (activeTab) {
-            case 'reading': contentHtml = renderReadingTab(unit); break;
-            case 'vocabulary': contentHtml = renderVocabularyTab(unit); break;
-            case 'grammar': contentHtml = renderGrammarTab(unit); break;
-            case 'comprehension': contentHtml = renderComprehensionTab(unit); break;
-            case 'sentenceBuilder': contentHtml = renderSentenceBuilderTab(unit); break;
-            case 'gapFill': contentHtml = renderGapFillTab(unit); break;
-            case 'oralPractice': contentHtml = renderOralPracticeTab(unit); break;
-            default: contentHtml = renderReadingTab(unit);
-        }
-
-        return `
-            <div class="space-y-6 py-2">
-                <!-- Unit Navigation Header -->
-                <div class="card-theme bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-                    <div class="flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <div class="flex items-center gap-2 mb-1">
-                                <span class="text-3xl">${unit.badge}</span>
-                                <span class="text-xs font-bold px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700">Unit ${unit.id} • ${unit.tense}</span>
-                            </div>
-                            <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900">${unit.title}</h2>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            ${unitId > 1 ? `<a href="#unit/${unitId-1}/reading" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-lg border border-slate-300 tap-target"><i class="fa-solid fa-chevron-left"></i> Prev Unit</a>` : ''}
-                            ${unitId < 4 ? `<a href="#unit/${unitId+1}/reading" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-lg border border-slate-300 tap-target">Next Unit <i class="fa-solid fa-chevron-right"></i></a>` : ''}
-                        </div>
-                    </div>
-
-                    <!-- Scrollable Activity Tabs -->
-                    <div class="flex items-center gap-2 mt-6 overflow-x-auto pb-2 border-t border-slate-100 pt-4 distraction-element">
-                        ${tabsNav}
-                    </div>
-                </div>
-
-                <!-- Tab Content Rendered -->
-                <div id="tab-content-area">
-                    ${contentHtml}
-                </div>
+            <div className="mb-8 max-w-md mx-auto text-left">
+              <label className="block text-xs font-black text-slate-700 mb-2 uppercase tracking-wider">
+                Enter Your Name:
+              </label>
+              <input
+                type="text"
+                value={studentName}
+                onChange={(e) => setStudentName(e.target.value)}
+                placeholder="e.g. Alex"
+                className="w-full px-5 py-3.5 rounded-2xl border-3 border-sky-300 focus:border-amber-400 focus:outline-hidden text-xl font-bold text-slate-800 shadow-inner bg-white"
+              />
             </div>
-        `;
-    }
 
-    function renderReadingTab(unit) {
-        const sentencesHtml = unit.reading.map((sentence, idx) => `
-            <div class="p-4 rounded-xl subcard-theme bg-slate-50 border border-slate-200 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 group hover:border-indigo-300" id="reading-sent-${idx}">
-                <div class="flex items-start gap-3 flex-grow">
-                    <span class="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center flex-shrink-0 mt-1 sm:mt-0">${idx + 1}</span>
-                    <p class="text-slate-800 text-lg leading-relaxed font-medium reading-text" data-text="${sentence}">${sentence}</p>
-                </div>
-                <button onclick="playSentenceSpeech(${idx}, '${sentence.replace(/'/g, "\\'")}')" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 rounded-lg text-sm font-semibold transition flex items-center gap-1.5 flex-shrink-0 tap-target">
-                    <i class="fa-solid fa-volume-high"></i> Listen
-                </button>
+            <h3 className="font-extrabold text-slate-700 text-sm mb-4 uppercase tracking-wider">
+              Select CEFR Reading Level:
+            </h3>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button
+                onClick={() => handleStartAssessment('A1')}
+                className="p-6 rounded-3xl bg-gradient-to-br from-cyan-400 to-blue-500 hover:from-cyan-500 hover:to-blue-600 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer border-3 border-white/50 flex flex-col items-center gap-2 group transform hover:-translate-y-1"
+              >
+                <span className="text-5xl group-hover:scale-110 transition-transform">🐬</span>
+                <span className="font-black text-2xl">Level 1 (A1)</span>
+                <span className="text-xs font-bold bg-white/20 px-3 py-1 rounded-full">
+                  Short & Simple • Word-by-Word
+                </span>
+                <span className="text-xs font-medium opacity-90 mt-1">The Playful Dolphin</span>
+              </button>
+
+              <button
+                onClick={() => handleStartAssessment('A2')}
+                className="p-6 rounded-3xl bg-gradient-to-br from-emerald-400 to-teal-600 hover:from-emerald-500 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all cursor-pointer border-3 border-white/50 flex flex-col items-center gap-2 group transform hover:-translate-y-1"
+              >
+                <span className="text-5xl group-hover:scale-110 transition-transform">🐢</span>
+                <span className="font-black text-2xl">Level 2 (A2)</span>
+                <span className="text-xs font-bold bg-white/20 px-3 py-1 rounded-full">
+                  Connected Sentences & Connectors
+                </span>
+                <span className="text-xs font-medium opacity-90 mt-1">The Journey of Sea Turtles</span>
+              </button>
             </div>
-        `).join('');
 
-        return `
-            <div class="card-theme bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-6">
-                <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
-                    <div>
-                        <h3 class="text-xl font-bold text-slate-800">Reading Passage</h3>
-                        <p class="text-xs text-slate-500">Listen to each sentence or read the full passage aloud.</p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button onclick="readAllPassage(${unit.id})" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-sm transition tap-target flex items-center gap-2">
-                            <i class="fa-solid fa-circle-play"></i> Read Entire Story
-                        </button>
-                        <button onclick="SpeechEngine.stop()" class="px-3 py-2 bg-rose-100 text-rose-700 hover:bg-rose-200 rounded-xl font-bold text-sm transition tap-target">
-                            <i class="fa-solid fa-circle-stop"></i> Stop Audio
-                        </button>
-                    </div>
-                </div>
+          </div>
+        </main>
+      )}
 
-                <div class="space-y-3">
-                    ${sentencesHtml}
-                </div>
-
-                <div class="p-4 rounded-xl bg-indigo-50 border border-indigo-100 text-sm text-indigo-900 flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-lightbulb text-indigo-600 text-lg"></i>
-                        <span>Finished reading? Move to the vocabulary flashcards next.</span>
-                    </div>
-                    <a href="#unit/${unit.id}/vocabulary" class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-bold text-xs hover:bg-indigo-700 tap-target whitespace-nowrap">
-                        Go to Vocabulary <i class="fa-solid fa-arrow-right ml-1"></i>
-                    </a>
-                </div>
+      {/* SCREEN 2: ASSESSMENT */}
+      {currentScreen === 'assessment' && currentLevelData && (
+        <main className="relative z-10 max-w-6xl mx-auto px-4 py-4 w-full flex-1 flex flex-col gap-4">
+          
+          {/* Progress Header Map */}
+          <div className="bg-white/90 backdrop-blur-md rounded-2xl p-4 shadow-lg border-2 border-sky-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-extrabold text-sky-950 text-sm flex items-center gap-2">
+                <Compass className="w-4 h-4 text-amber-500" />
+                {currentLevelData.levelTitle}
+              </span>
+              <span className="font-black text-sky-800 text-xs bg-sky-100 px-3 py-1 rounded-full border border-sky-200">
+                Question {currentQuestionIdx + 1} of {totalQuestions}
+              </span>
             </div>
-        `;
-    }
 
-    function renderVocabularyTab(unit) {
-        const cardsHtml = unit.vocabulary.map((item, idx) => `
-            <div class="card-theme bg-white border border-slate-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between space-y-3">
-                <div>
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-3xl">${item.icon}</span>
-                        <button onclick="SpeechEngine.speak('${item.word}')" class="w-9 h-9 bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-600 rounded-full transition flex items-center justify-center tap-target">
-                            <i class="fa-solid fa-volume-high"></i>
-                        </button>
-                    </div>
-                    <h4 class="text-xl font-extrabold text-slate-900 capitalize">${item.word}</h4>
-                    <p class="text-sm font-semibold text-emerald-600 mb-2">🇪🇸 ${item.spanish}</p>
-                    <p class="text-sm text-slate-600 leading-normal mb-3">${item.definition}</p>
-                </div>
-                <div class="subcard-theme bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs text-slate-700 font-medium">
-                    <span class="text-slate-400 font-bold block mb-1">EXAMPLE:</span>
-                    "${item.example}"
-                </div>
+            <div className="relative w-full h-8 bg-sky-200/80 rounded-full overflow-visible border-2 border-sky-300 flex items-center px-1">
+              <div 
+                className="h-4 bg-gradient-to-r from-amber-400 to-yellow-300 rounded-full transition-all duration-500 shadow-inner"
+                style={{ width: `${((currentQuestionIdx + 1) / totalQuestions) * 100}%` }}
+              ></div>
+              <div 
+                className="absolute top-1/2 -translate-y-1/2 transition-all duration-500 z-10 drop-shadow-md"
+                style={{ left: `calc(${((currentQuestionIdx + 1) / totalQuestions) * 100}% - 28px)` }}
+              >
+                <SubmarineIcon className="w-10 h-10 animate-bounce-slow" />
+              </div>
             </div>
-        `).join('');
+          </div>
 
-        return `
-            <div class="space-y-6">
-                <div class="card-theme bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex items-center justify-between flex-wrap gap-4">
-                    <div>
-                        <h3 class="text-xl font-bold text-slate-800">Unit Key Vocabulary</h3>
-                        <p class="text-xs text-slate-500">Master the 6 key words used in this story before practicing grammar.</p>
+          {/* Passage & Question Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+            
+            {/* Passage Panel */}
+            <div className="lg:col-span-6 bg-white/95 backdrop-blur-md rounded-3xl p-6 shadow-xl border-4 border-sky-100 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between border-b pb-3 mb-3 border-slate-200">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-3xl">{currentLevelData.avatar}</span>
+                      <h2 className="text-2xl font-black text-sky-950">
+                        {currentLevelData.passageTitle}
+                      </h2>
                     </div>
-                    <button onclick="speakAllVocab(${unit.id})" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-sm transition tap-target flex items-center gap-2">
-                        <i class="fa-solid fa-volume-high"></i> Pronounce All Words
-                    </button>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
-                    ${cardsHtml}
-                </div>
-            </div>
-        `;
-    }
-
-    function renderGrammarTab(unit) {
-        const formulaHtml = unit.grammar.formula.map(part => `
-            <div class="flex-1 min-w-[140px] bg-white rounded-xl p-4 border border-slate-200 shadow-sm text-center space-y-1">
-                <p class="text-lg font-extrabold token-${part.role}">${part.text}</p>
-                <span class="inline-block px-2 py-0.5 rounded text-xs font-bold bg-slate-100 text-slate-600">${part.desc}</span>
-            </div>
-        `).join('<div class="self-center font-bold text-slate-400 text-xl hidden sm:block">+</div>');
-
-        const examplesHtml = unit.grammar.examples.map((ex, idx) => `
-            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-3">
-                <div class="text-lg">
-                    <span class="token-subject">${ex.subject}</span> 
-                    <span class="token-verb">${ex.verb}</span> 
-                    <span class="token-complement">${ex.complement}</span>
-                </div>
-                <button onclick="SpeechEngine.speak('${ex.subject} ${ex.verb} ${ex.complement}')" class="px-3 py-1 bg-white hover:bg-indigo-50 border border-slate-300 text-slate-700 rounded-lg text-xs font-bold transition tap-target">
-                    <i class="fa-solid fa-volume-high text-indigo-600"></i> Audio
-                </button>
-            </div>
-        `).join('');
-
-        return `
-            <div class="card-theme bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-8">
-                <!-- Title & Explanation -->
-                <div>
-                    <h3 class="text-2xl font-extrabold text-slate-900 mb-2">${unit.grammar.title}</h3>
-                    <p class="text-slate-700 text-base leading-relaxed bg-indigo-50/70 p-4 rounded-xl border border-indigo-100">
-                        ${unit.grammar.explanation}
-                    </p>
-                </div>
-
-                <!-- Formula / Structure Breakdown -->
-                <div>
-                    <h4 class="text-lg font-bold text-slate-800 mb-3">${unit.grammar.colorCodeTitle}</h4>
-                    <div class="flex flex-wrap gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                        ${formulaHtml}
-                    </div>
-                </div>
-
-                <!-- Color Key Legend -->
-                <div class="flex flex-wrap items-center gap-4 text-xs font-bold p-3 bg-slate-100 rounded-xl">
-                    <span class="text-slate-500">Color Legend:</span>
-                    <span class="px-2 py-1 bg-blue-100 token-subject rounded">Subject</span>
-                    <span class="px-2 py-1 bg-emerald-100 token-verb rounded">Verb</span>
-                    <span class="px-2 py-1 bg-orange-100 token-complement rounded">Complement / Time</span>
-                </div>
-
-                <!-- Sentence Examples -->
-                <div>
-                    <h4 class="text-lg font-bold text-slate-800 mb-3">Sentence Examples</h4>
-                    <div class="space-y-3">
-                        ${examplesHtml}
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    function renderComprehensionTab(unit) {
-        const questionsHtml = unit.comprehension.map((q, idx) => {
-            const optionsHtml = q.options.map((opt, oIdx) => `
-                <label class="flex items-center p-3 rounded-xl border border-slate-200 hover:bg-indigo-50/50 cursor-pointer transition tap-target">
-                    <input type="radio" name="q-${q.id}" value="${opt}" class="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-500">
-                    <span class="ml-3 text-sm font-medium text-slate-800">${opt}</span>
-                </label>
-            `).join('');
-
-            return `
-                <div class="subcard-theme bg-slate-50 rounded-2xl p-5 border border-slate-200 space-y-4" id="quiz-q-${q.id}">
-                    <div class="flex items-start justify-between gap-3">
-                        <h4 class="text-base font-bold text-slate-900">${idx + 1}. ${q.question}</h4>
-                        <button onclick="toggleHint('hint-${q.id}')" class="text-xs text-amber-600 hover:text-amber-700 font-bold bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 tap-target">
-                            💡 Hint
-                        </button>
-                    </div>
-                    
-                    <div id="hint-${q.id}" class="hidden p-2.5 rounded-lg bg-amber-100/70 border border-amber-300 text-xs text-amber-900 font-medium">
-                        Hint: ${q.hint}
-                    </div>
-
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        ${optionsHtml}
-                    </div>
-
-                    <div id="feedback-${q.id}" class="hidden text-xs font-bold p-2 rounded-lg"></div>
-                </div>
-            `;
-        }).join('');
-
-        return `
-            <div class="card-theme bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-6">
-                <div class="flex items-center justify-between border-b border-slate-100 pb-4">
-                    <div>
-                        <h3 class="text-xl font-bold text-slate-800">Reading Comprehension Quiz</h3>
-                        <p class="text-xs text-slate-500">Answer 5 questions about the Unit ${unit.id} story.</p>
-                    </div>
-                    <span class="text-xs font-bold px-3 py-1 bg-amber-100 text-amber-800 rounded-full">5 Questions</span>
-                </div>
-
-                <form id="quiz-form" class="space-y-4">
-                    ${questionsHtml}
-                    
-                    <div class="pt-4 flex items-center justify-between gap-4">
-                        <button type="button" onclick="gradeComprehensionQuiz(${unit.id})" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition shadow-md tap-target flex items-center gap-2">
-                            <i class="fa-solid fa-check"></i> Submit Answers
-                        </button>
-                        <div id="quiz-overall-result" class="text-sm font-bold"></div>
-                    </div>
-                </form>
-            </div>
-        `;
-    }
-
-    function renderSentenceBuilderTab(unit) {
-        const sentencesHtml = unit.sentenceBuilder.map((rawSent, idx) => {
-            const parts = rawSent.split(' / ');
-            // Shuffle parts for building activity
-            const shuffled = [...parts].sort(() => Math.random() - 0.5);
-
-            const optionsHtml = shuffled.map((part, pIdx) => `
-                <button type="button" onclick="addPartToSentence(${idx}, '${part.replace(/'/g, "\\'")}', this)" class="px-3 py-2 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 font-semibold rounded-lg text-sm transition tap-target">
-                    ${part}
-                </button>
-            `).join('');
-
-            return `
-                <div class="subcard-theme bg-slate-50 rounded-2xl p-5 border border-slate-200 space-y-3" id="builder-item-${idx}">
-                    <p class="text-xs font-bold text-slate-500">Sentence ${idx + 1}: Click the blocks in correct word order</p>
-                    
-                    <div id="builder-target-${idx}" class="min-h-[48px] p-2 rounded-xl bg-white border-2 border-dashed border-slate-300 flex flex-wrap items-center gap-2">
-                        <!-- Placed blocks appear here -->
-                    </div>
-
-                    <div class="flex flex-wrap gap-2 pt-2">
-                        ${optionsHtml}
-                    </div>
-
-                    <div class="flex items-center gap-3 pt-2">
-                        <button onclick="checkBuiltSentence(${idx}, '${rawSent.replace(/\ /g, '').replace(/\//g, '')}')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition tap-target">
-                            Check
-                        </button>
-                        <button onclick="resetBuiltSentence(${idx})" class="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg transition tap-target">
-                            Reset
-                        </button>
-                        <span id="builder-feedback-${idx}" class="text-xs font-bold"></span>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        return `
-            <div class="card-theme bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-6">
-                <div>
-                    <h3 class="text-xl font-bold text-slate-800">Scrambled Sentence Builder</h3>
-                    <p class="text-xs text-slate-500">Construct correct English sentences block by block.</p>
-                </div>
-
-                <div class="space-y-4">
-                    ${sentencesHtml}
-                </div>
-            </div>
-        `;
-    }
-
-    function renderGapFillTab(unit) {
-        const itemsHtml = unit.finalPractice.map((item, idx) => {
-            const choicesHtml = item.choices.map(choice => `
-                <option value="${choice}">${choice}</option>
-            `).join('');
-
-            return `
-                <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-wrap items-center justify-between gap-3" id="gap-item-${item.id}">
-                    <div class="text-base text-slate-800 font-medium">
-                        ${idx + 1}. ${item.text.replace('_____', `
-                            <select id="gap-select-${item.id}" class="mx-1 px-2 py-1 border border-indigo-300 rounded-lg bg-white font-bold text-indigo-700 focus:ring-indigo-500 text-sm">
-                                <option value="">-- select --</option>
-                                ${choicesHtml}
-                            </select>
-                        `)}
-                    </div>
-                    <span id="gap-feedback-${item.id}" class="text-xs font-bold"></span>
-                </div>
-            `;
-        }).join('');
-
-        return `
-            <div class="card-theme bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-6">
-                <div>
-                    <h3 class="text-xl font-bold text-slate-800">Fill in the Gaps Practice</h3>
-                    <p class="text-xs text-slate-500">Choose the correct grammar form to complete each sentence.</p>
-                </div>
-
-                <div class="space-y-3">
-                    ${itemsHtml}
-                </div>
-
-                <div class="pt-2 flex items-center justify-between gap-4">
-                    <button onclick="checkGapFillAnswers(${unit.id})" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition tap-target flex items-center gap-2">
-                        <i class="fa-solid fa-square-check"></i> Verify All Answers
-                    </button>
-                    <div id="gap-fill-result" class="text-sm font-bold"></div>
-                </div>
-            </div>
-        `;
-    }
-
-    function renderOralPracticeTab(unit) {
-        const p = unit.personalPractice;
-        const savedNote = AppState.studentNotes[unit.id] || '';
-
-        const speakingPromptList = p.speaking.map((spk, idx) => `
-            <li class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm text-slate-800 flex items-start justify-between gap-3">
-                <span><strong>${idx + 1}.</strong> ${spk}</span>
-                <button onclick="SpeechEngine.speak('${spk.replace(/'/g, "\\'")}')" class="px-2.5 py-1 bg-white border border-slate-300 hover:bg-indigo-50 text-indigo-700 rounded-lg text-xs font-bold tap-target">
-                    <i class="fa-solid fa-volume-high"></i>
-                </button>
-            </li>
-        `).join('');
-
-        return `
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Oral Speaking Prompts -->
-                <div class="card-theme bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-4">
-                    <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-                        <i class="fa-solid fa-microphone-lines text-indigo-600"></i> Speaking Prompts
-                    </h3>
-                    <p class="text-xs text-slate-500">Practice speaking answers aloud with a classmate or teacher.</p>
-                    
-                    <ul class="space-y-2">
-                        ${speakingPromptList}
-                    </ul>
-
-                    <!-- Micro Practice Widget -->
-                    <div class="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 text-center space-y-3">
-                        <p class="text-xs font-bold text-indigo-900">Speech Audio Tester</p>
-                        <button id="mic-btn" onclick="startMicRecognition()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition shadow-sm tap-target inline-flex items-center gap-2">
-                            <i class="fa-solid fa-microphone"></i> Press to Speak English
-                        </button>
-                        <p id="mic-transcript" class="text-xs text-slate-600 italic">Click button and speak into your microphone...</p>
-                    </div>
-                </div>
-
-                <!-- Personal Writing Practice -->
-                <div class="card-theme bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-4">
-                    <h3 class="text-xl font-bold text-slate-800 flex items-center gap-2">
-                        <i class="fa-solid fa-pen-nib text-emerald-600"></i> Writing Practice
-                    </h3>
-                    <p class="text-xs text-slate-500">Write your personal answers or story sentences below.</p>
-
-                    <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-xs text-emerald-900">
-                        <strong>Model Example:</strong> "${p.model}"
-                    </div>
-
-                    <textarea id="personal-writing-input" rows="6" placeholder="Type your personal sentences here..." class="w-full p-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm font-medium text-slate-800">${savedNote}</textarea>
-
-                    <div class="flex items-center justify-between">
-                        <button onclick="saveStudentWriting(${unit.id})" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-sm transition tap-target">
-                            <i class="fa-solid fa-floppy-disk"></i> Save Writing
-                        </button>
-                        <span id="save-status-msg" class="text-xs font-bold text-emerald-600"></span>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    function renderVerbsView() {
-        return `
-            <div class="card-theme bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-6">
-                <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
-                    <div>
-                        <h2 class="text-2xl font-extrabold text-slate-900">A1–A2 English Verb Dictionary</h2>
-                        <p class="text-xs text-slate-500">Master Regular (-ed) and Irregular verbs with pronunciation audio.</p>
-                    </div>
-                    <span class="text-xs font-bold px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full">${VERB_LIST.length} Total Verbs</span>
-                </div>
-
-                <!-- Search & Filters -->
-                <div class="flex flex-wrap items-center gap-3">
-                    <div class="relative flex-grow max-w-md">
-                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-3.5 text-slate-400 text-sm"></i>
-                        <input type="text" id="verb-search-input" onkeyup="filterVerbList()" placeholder="Search verb in English or Spanish..." class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-indigo-500 text-sm font-medium">
-                    </div>
-                    
-                    <select id="verb-type-filter" onchange="filterVerbList()" class="px-3 py-2.5 rounded-xl border border-slate-300 text-sm font-semibold bg-white">
-                        <option value="all">All Verbs</option>
-                        <option value="regular">Regular Verbs (-ed)</option>
-                        <option value="irregular">Irregular Verbs</option>
-                    </select>
-                </div>
-
-                <!-- Verb Table -->
-                <div class="overflow-x-auto rounded-xl border border-slate-200">
-                    <table class="w-full text-left border-collapse text-sm">
-                        <thead>
-                            <tr class="bg-slate-100 text-slate-700 font-bold text-xs uppercase border-b border-slate-200">
-                                <th class="p-3">Base / Present</th>
-                                <th class="p-3">Past Simple</th>
-                                <th class="p-3">Future (WILL)</th>
-                                <th class="p-3">Spanish</th>
-                                <th class="p-3 text-center">Type</th>
-                                <th class="p-3 text-center">Audio</th>
-                            </tr>
-                        </thead>
-                        <tbody id="verb-table-body" class="divide-y divide-slate-100">
-                            <!-- Populated via JS -->
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-    }
-
-    function renderProgressView() {
-        let totalScore = 0;
-        let completedCount = 0;
-
-        const rowsHtml = Object.values(UNIT_DATA).map(unit => {
-            const prog = AppState.progress[unit.id] || { quizScore: 0, completed: false, gapFillScore: 0 };
-            if (prog.completed) completedCount++;
-            totalScore += (prog.quizScore || 0);
-
-            return `
-                <tr class="hover:bg-slate-50 transition">
-                    <td class="p-4 font-bold text-slate-900">
-                        <span class="mr-2">${unit.badge}</span> Unit ${unit.id}: ${unit.title}
-                    </td>
-                    <td class="p-4 font-medium text-slate-600">${unit.tense}</td>
-                    <td class="p-4 font-bold ${prog.quizScore >= 80 ? 'text-emerald-600' : 'text-slate-700'}">
-                        ${prog.quizScore || 0}%
-                    </td>
-                    <td class="p-4">
-                        ${prog.completed 
-                            ? '<span class="px-2.5 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full">✅ Passed</span>'
-                            : '<span class="px-2.5 py-1 bg-slate-100 text-slate-600 text-xs font-bold rounded-full">In Progress</span>'
-                        }
-                    </td>
-                    <td class="p-4 text-right">
-                        <a href="#unit/${unit.id}/reading" class="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-600 hover:text-white text-indigo-700 rounded-lg text-xs font-bold transition">
-                            Practice
-                        </a>
-                    </td>
-                </tr>
-            `;
-        }).join('');
-
-        const avgScore = Math.round(totalScore / 4);
-
-        return `
-            <div class="card-theme bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-6">
-                <div>
-                    <h2 class="text-2xl font-extrabold text-slate-900 mb-1">Student Learning Dashboard</h2>
-                    <p class="text-xs text-slate-500">Track your comprehension scores and unit completions.</p>
-                </div>
-
-                <!-- Stats Cards -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div class="p-5 bg-indigo-50 rounded-2xl border border-indigo-100 text-center space-y-1">
-                        <span class="text-3xl font-extrabold text-indigo-700">${completedCount} / 4</span>
-                        <p class="text-xs font-bold text-slate-600">Units Completed</p>
-                    </div>
-                    <div class="p-5 bg-emerald-50 rounded-2xl border border-emerald-100 text-center space-y-1">
-                        <span class="text-3xl font-extrabold text-emerald-700">${avgScore}%</span>
-                        <p class="text-xs font-bold text-slate-600">Average Quiz Score</p>
-                    </div>
-                    <div class="p-5 bg-amber-50 rounded-2xl border border-amber-100 text-center space-y-1">
-                        <span class="text-3xl font-extrabold text-amber-600">${completedCount === 4 ? '🏆 A1-A2 Ready' : '⭐ Scholar'}</span>
-                        <p class="text-xs font-bold text-slate-600">Achievement Badge</p>
-                    </div>
-                </div>
-
-                <!-- Progress Table -->
-                <div class="overflow-x-auto rounded-xl border border-slate-200">
-                    <table class="w-full text-left border-collapse text-sm">
-                        <thead>
-                            <tr class="bg-slate-100 text-slate-700 font-bold text-xs uppercase border-b border-slate-200">
-                                <th class="p-4">Unit Title</th>
-                                <th class="p-4">Grammar Focus</th>
-                                <th class="p-4">Quiz Score</th>
-                                <th class="p-4">Status</th>
-                                <th class="p-4 text-right">Action</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            ${rowsHtml}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div class="pt-2 flex justify-end">
-                    <button onclick="resetAllProgress()" class="px-4 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 text-xs font-bold rounded-xl transition tap-target">
-                        <i class="fa-solid fa-trash-can mr-1"></i> Reset All Progress
-                    </button>
-                </div>
-            </div>
-        `;
-    }
-
-    function renderPreferencesView() {
-        const pref = AppState.preferences;
-
-        return `
-            <div class="card-theme bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-6 max-w-2xl mx-auto">
-                <div>
-                    <h2 class="text-2xl font-extrabold text-slate-900 mb-1">Display & Reading Preferences</h2>
-                    <p class="text-xs text-slate-500">Customize font size, line spacing, contrast, and voice speed.</p>
-                </div>
-
-                <div class="space-y-5 divide-y divide-slate-100">
-                    <!-- Font Family Choice -->
-                    <div class="pt-3 space-y-2">
-                        <label class="block text-sm font-bold text-slate-800">Reading Font</label>
-                        <select id="pref-font-family" class="w-full p-2.5 rounded-xl border border-slate-300 text-sm font-semibold">
-                            <option value="'Comic Neue', sans-serif" ${pref.fontFamily.includes('Comic') ? 'selected' : ''}>Comic Neue (Rounded Clarity)</option>
-                            <option value="'Lexend', sans-serif" ${pref.fontFamily.includes('Lexend') ? 'selected' : ''}>Lexend (Dyslexia Friendly)</option>
-                            <option value="'Inter', sans-serif" ${pref.fontFamily.includes('Inter') ? 'selected' : ''}>Inter (Clean Modern)</option>
-                        </select>
-                    </div>
-
-                    <!-- Text Size -->
-                    <div class="pt-4 space-y-2">
-                        <label class="block text-sm font-bold text-slate-800">Base Text Size</label>
-                        <select id="pref-font-size" class="w-full p-2.5 rounded-xl border border-slate-300 text-sm font-semibold">
-                            <option value="17px" ${pref.fontSize === '17px' ? 'selected' : ''}>Standard (17px)</option>
-                            <option value="19px" ${pref.fontSize === '19px' ? 'selected' : ''}>Large (19px - Default)</option>
-                            <option value="22px" ${pref.fontSize === '22px' ? 'selected' : ''}>Extra Large (22px)</option>
-                        </select>
-                    </div>
-
-                    <!-- Line Spacing -->
-                    <div class="pt-4 space-y-2">
-                        <label class="block text-sm font-bold text-slate-800">Line Height Spacing</label>
-                        <select id="pref-line-spacing" class="w-full p-2.5 rounded-xl border border-slate-300 text-sm font-semibold">
-                            <option value="1.5" ${pref.lineSpacing === '1.5' ? 'selected' : ''}>Normal (1.5)</option>
-                            <option value="1.8" ${pref.lineSpacing === '1.8' ? 'selected' : ''}>Comfortable (1.8 - Recommended)</option>
-                            <option value="2.1" ${pref.lineSpacing === '2.1' ? 'selected' : ''}>Wide (2.1)</option>
-                        </select>
-                    </div>
-
-                    <!-- High Contrast Toggle -->
-                    <div class="pt-4 flex items-center justify-between">
-                        <div>
-                            <strong class="text-sm text-slate-800 block">High Contrast Mode</strong>
-                            <span class="text-xs text-slate-500">Dark slate background with white text.</span>
-                        </div>
-                        <input type="checkbox" id="pref-high-contrast" ${pref.highContrast ? 'checked' : ''} class="w-5 h-5 text-indigo-600 rounded">
-                    </div>
-
-                    <!-- Focus Mode Toggle -->
-                    <div class="pt-4 flex items-center justify-between">
-                        <div>
-                            <strong class="text-sm text-slate-800 block">Focus Mode</strong>
-                            <span class="text-xs text-slate-500">Hide navigation bars for distraction-free reading.</span>
-                        </div>
-                        <input type="checkbox" id="pref-focus-mode" ${pref.focusMode ? 'checked' : ''} class="w-5 h-5 text-indigo-600 rounded">
-                    </div>
-
-                    <!-- Speech Speed -->
-                    <div class="pt-4 space-y-2">
-                        <label class="block text-sm font-bold text-slate-800">Audio Speech Speed</label>
-                        <select id="pref-speech-rate" class="w-full p-2.5 rounded-xl border border-slate-300 text-sm font-semibold">
-                            <option value="0.75" ${pref.speechRate === 0.75 ? 'selected' : ''}>Slow (0.75x)</option>
-                            <option value="0.9" ${pref.speechRate === 0.9 ? 'selected' : ''}>Normal (0.9x - Recommended)</option>
-                            <option value="1.0" ${pref.speechRate === 1.0 ? 'selected' : ''}>Full Speed (1.0x)</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="pt-4">
-                    <button onclick="saveAndApplyPreferences()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-md transition tap-target">
-                        Save & Apply Settings
-                    </button>
-                </div>
-            </div>
-        `;
-    }
-
-    function renderTeacherView() {
-        return `
-            <div class="card-theme bg-white rounded-2xl p-6 shadow-sm border border-slate-200 space-y-6">
-                <div>
-                    <h2 class="text-2xl font-extrabold text-slate-900 mb-1">Teacher & Educator Hub</h2>
-                    <p class="text-xs text-slate-500">Pedagogical overview and student summary exporter.</p>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="p-5 bg-slate-50 rounded-2xl border border-slate-200 space-y-3">
-                        <h3 class="text-lg font-bold text-indigo-900">📚 CEFR A1–A2 Curriculum Alignment</h3>
-                        <p class="text-sm text-slate-700 leading-relaxed">
-                            ReadBridge is constructed to reinforce foundational grammar tenses required for young learners and beginners:
-                        </p>
-                        <ul class="text-xs text-slate-600 space-y-2 list-disc pl-4">
-                            <li><strong>Unit 1:</strong> Simple Present (habits, third-person -s)</li>
-                            <li><strong>Unit 2:</strong> Past Simple Regular Verbs (-ed endings & time markers)</li>
-                            <li><strong>Unit 3:</strong> Past Simple Irregular Verbs (went, saw, took, ate)</li>
-                            <li><strong>Unit 4:</strong> Future with WILL (predictions & personal goals)</li>
-                        </ul>
-                    </div>
-
-                    <div class="p-5 bg-indigo-50 rounded-2xl border border-indigo-100 space-y-3">
-                        <h3 class="text-lg font-bold text-indigo-900">📄 Generate Student Progress Report</h3>
-                        <p class="text-sm text-indigo-950 leading-relaxed">
-                            Click below to generate a printable record of the student's quiz scores, completed units, and saved written practice responses.
-                        </p>
-                        <button onclick="generateTeacherReport()" class="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow transition tap-target flex items-center gap-2">
-                            <i class="fa-solid fa-file-pdf"></i> View Printable Summary
-                        </button>
-                    </div>
-                </div>
-
-                <div id="teacher-report-modal" class="hidden p-6 bg-slate-100 border border-slate-300 rounded-2xl space-y-4">
-                    <div class="flex items-center justify-between">
-                        <h3 class="text-xl font-bold text-slate-900">ReadBridge Student Summary Report</h3>
-                        <button onclick="document.getElementById('teacher-report-modal').classList.add('hidden')" class="text-sm font-bold text-slate-500 hover:text-slate-800">Close</button>
-                    </div>
-                    <div id="teacher-report-content" class="bg-white p-6 rounded-xl border border-slate-200 text-sm font-mono whitespace-pre-wrap"></div>
-                </div>
-            </div>
-        `;
-    }
-
-    function playSentenceSpeech(sentIdx, text) {
-        document.querySelectorAll('.highlighted-sentence').forEach(el => el.classList.remove('highlighted-sentence'));
-        const container = document.getElementById(`reading-sent-${sentIdx}`);
-        if (container) container.classList.add('highlighted-sentence');
-
-        SpeechEngine.speak(text, () => {
-            if (container) container.classList.remove('highlighted-sentence');
-        });
-    }
-
-    function readAllPassage(unitId) {
-        const unit = UNIT_DATA[unitId];
-        if (!unit) return;
-        let index = 0;
-
-        function speakNext() {
-            if (index >= unit.reading.length) {
-                document.querySelectorAll('.highlighted-sentence').forEach(el => el.classList.remove('highlighted-sentence'));
-                return;
-            }
-            playSentenceSpeech(index, unit.reading[index]);
-            index++;
-            setTimeout(speakNext, 3500);
-        }
-        speakNext();
-    }
-
-    function speakAllVocab(unitId) {
-        const unit = UNIT_DATA[unitId];
-        if (!unit) return;
-        let words = unit.vocabulary.map(v => v.word);
-        let index = 0;
-
-        function nextWord() {
-            if (index >= words.length) return;
-            SpeechEngine.speak(words[index], () => {
-                index++;
-                setTimeout(nextWord, 800);
-            });
-        }
-        nextWord();
-    }
-
-    /* Quiz logic */
-    function toggleHint(hintId) {
-        const hintEl = document.getElementById(hintId);
-        if (hintEl) hintEl.classList.toggle('hidden');
-    }
-
-    function gradeComprehensionQuiz(unitId) {
-        const unit = UNIT_DATA[unitId];
-        if (!unit) return;
-
-        let correctCount = 0;
-
-        unit.comprehension.forEach(q => {
-            const selected = document.querySelector(`input[name="q-${q.id}"]:checked`);
-            const feedback = document.getElementById(`feedback-${q.id}`);
-            feedback.classList.remove('hidden', 'bg-emerald-100', 'text-emerald-800', 'bg-rose-100', 'text-rose-800');
-
-            if (selected && selected.value === q.correct) {
-                correctCount++;
-                feedback.classList.add('bg-emerald-100', 'text-emerald-800');
-                feedback.innerHTML = `✓ Correct! ${q.correct}`;
-            } else {
-                feedback.classList.add('bg-rose-100', 'text-rose-800');
-                feedback.innerHTML = `✗ Incorrect. Correct answer: ${q.correct}`;
-            }
-        });
-
-        const scorePct = Math.round((correctCount / unit.comprehension.length) * 100);
-        const overall = document.getElementById('quiz-overall-result');
-        if (overall) {
-            overall.className = `p-3 rounded-xl font-bold text-sm ${scorePct >= 80 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'}`;
-            overall.innerHTML = `Score: ${scorePct}% (${correctCount}/${unit.comprehension.length} correct)`;
-        }
-
-        // Save progress
-        if (!AppState.progress[unitId]) AppState.progress[unitId] = {};
-        AppState.progress[unitId].quizScore = scorePct;
-        AppState.progress[unitId].completed = scorePct >= 80;
-        saveProgress();
-    }
-
-    /* Sentence Builder logic */
-    function addPartToSentence(sentIdx, partText, btnElement) {
-        const targetContainer = document.getElementById(`builder-target-${sentIdx}`);
-        if (!targetContainer) return;
-
-        const block = document.createElement('span');
-        block.className = 'px-3 py-1.5 bg-indigo-600 text-white rounded-lg font-bold text-sm shadow-xs flex items-center gap-1 cursor-pointer';
-        block.innerHTML = `${partText} <i class="fa-solid fa-xmark text-xs opacity-75"></i>`;
-        
-        block.onclick = () => {
-            block.remove();
-            btnElement.disabled = false;
-            btnElement.classList.remove('opacity-40');
-        };
-
-        targetContainer.appendChild(block);
-        btnElement.disabled = true;
-        btnElement.classList.add('opacity-40');
-    }
-
-    function checkBuiltSentence(sentIdx, targetClean) {
-        const targetContainer = document.getElementById(`builder-target-${sentIdx}`);
-        const feedback = document.getElementById(`builder-feedback-${sentIdx}`);
-        if (!targetContainer || !feedback) return;
-
-        const currentText = Array.from(targetContainer.children)
-            .map(c => c.innerText.replace(' ✕', '').trim())
-            .join('')
-            .replace(/\ /g, '');
-
-        if (currentText === targetClean) {
-            feedback.className = "text-xs font-bold text-emerald-600";
-            feedback.innerText = "✓ Perfect Sentence!";
-        } else {
-            feedback.className = "text-xs font-bold text-rose-600";
-            feedback.innerText = "✗ Not quite right. Try resetting.";
-        }
-    }
-
-    function resetBuiltSentence(sentIdx) {
-        const targetContainer = document.getElementById(`builder-target-${sentIdx}`);
-        const parent = document.getElementById(`builder-item-${sentIdx}`);
-        const feedback = document.getElementById(`builder-feedback-${sentIdx}`);
-        
-        if (targetContainer) targetContainer.innerHTML = '';
-        if (feedback) feedback.innerText = '';
-        if (parent) {
-            parent.querySelectorAll('button').forEach(btn => {
-                btn.disabled = false;
-                btn.classList.remove('opacity-40');
-            });
-        }
-    }
-
-    /* Gap fill logic */
-    function checkGapFillAnswers(unitId) {
-        const unit = UNIT_DATA[unitId];
-        if (!unit) return;
-
-        let correct = 0;
-        unit.finalPractice.forEach(item => {
-            const select = document.getElementById(`gap-select-${item.id}`);
-            const feedback = document.getElementById(`gap-feedback-${item.id}`);
-            if (select && feedback) {
-                if (select.value === item.gap) {
-                    correct++;
-                    feedback.className = "text-xs font-bold text-emerald-600";
-                    feedback.innerText = "✓ Correct";
-                } else {
-                    feedback.className = "text-xs font-bold text-rose-600";
-                    feedback.innerText = `✗ Answer: ${item.gap}`;
-                }
-            }
-        });
-
-        const res = document.getElementById('gap-fill-result');
-        if (res) {
-            res.className = "p-2 rounded-lg bg-indigo-50 text-indigo-900 font-bold text-sm";
-            res.innerText = `Result: ${correct} / ${unit.finalPractice.length} Correct`;
-        }
-    }
-
-    /* Oral & Writing practice */
-    function startMicRecognition() {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const transcriptEl = document.getElementById('mic-transcript');
-        
-        if (!SpeechRecognition) {
-            if (transcriptEl) transcriptEl.innerText = "Speech Recognition API not supported in this browser. You can still practice speaking out loud!";
-            return;
-        }
-
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'en-US';
-        recognition.interimResults = false;
-
-        if (transcriptEl) transcriptEl.innerText = "Listening... Speak now!";
-
-        recognition.onresult = (event) => {
-            const text = event.results[0][0].transcript;
-            if (transcriptEl) transcriptEl.innerText = `You said: "${text}"`;
-        };
-
-        recognition.onerror = () => {
-            if (transcriptEl) transcriptEl.innerText = "Mic error or permission denied.";
-        };
-
-        recognition.start();
-    }
-
-    function saveStudentWriting(unitId) {
-        const text = document.getElementById('personal-writing-input').value;
-        AppState.studentNotes[unitId] = text;
-        saveNotes();
-
-        const msg = document.getElementById('save-status-msg');
-        if (msg) {
-            msg.innerText = "Saved successfully!";
-            setTimeout(() => { msg.innerText = ''; }, 2500);
-        }
-    }
-
-    /* Verb Dictionary filters */
-    function attachVerbEventListeners() {
-        populateVerbTable(VERB_LIST);
-    }
-
-    function populateVerbTable(list) {
-        const tbody = document.getElementById('verb-table-body');
-        if (!tbody) return;
-
-        tbody.innerHTML = list.map(v => `
-            <tr class="hover:bg-slate-50 transition">
-                <td class="p-3 font-bold text-slate-900">${v.pres}</td>
-                <td class="p-3 font-semibold text-emerald-700">${v.past}</td>
-                <td class="p-3 text-slate-700">${v.future}</td>
-                <td class="p-3 text-slate-600 italic">${v.spanish}</td>
-                <td class="p-3 text-center">
-                    <span class="px-2 py-0.5 text-xs font-bold rounded ${v.type === 'regular' ? 'bg-indigo-100 text-indigo-800' : 'bg-amber-100 text-amber-800'}">
-                        ${v.type}
+                    <span className="text-xs font-extrabold text-teal-700 bg-teal-50 px-2.5 py-0.5 rounded-full border border-teal-200 inline-block mt-1">
+                      {currentLevelData.cefrBadge}
                     </span>
-                </td>
-                <td class="p-3 text-center">
-                    <button onclick="SpeechEngine.speak('${v.pres}, ${v.past}, ${v.future}')" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-indigo-600 hover:text-white text-slate-600 transition flex items-center justify-center mx-auto tap-target">
-                        <i class="fa-solid fa-volume-high text-xs"></i>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      if (isPlayingAudio) {
+                        stopAudio();
+                      } else {
+                        const fullPassageText = currentLevelData.passageParagraphs
+                          .map(p => p.text.replace(/\{(\w+)\}/g, '$1'))
+                          .join(' ');
+                        speakText(fullPassageText);
+                      }
+                    }}
+                    className={`px-3.5 py-2 rounded-xl font-black text-sm flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
+                      isPlayingAudio
+                        ? 'bg-amber-500 text-white animate-pulse'
+                        : 'bg-sky-100 hover:bg-sky-200 text-sky-900 border border-sky-200'
+                    }`}
+                  >
+                    {isPlayingAudio ? <Pause className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-sky-600" />}
+                    <span>{isPlayingAudio ? 'Stop' : 'Read Aloud'}</span>
+                  </button>
+                </div>
+
+                {/* CEFR Reading Tip */}
+                <div className="mb-4 bg-amber-50 border-l-4 border-amber-400 p-2.5 rounded-r-xl text-xs font-bold text-amber-900 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>{currentLevelData.readingTip}</span>
+                </div>
+
+                {/* Story Paragraphs */}
+                <div className="space-y-4">
+                  {currentLevelData.passageParagraphs.map((paragraph, idx) => (
+                    <InteractivePassageText
+                      key={idx}
+                      paragraph={paragraph}
+                      onSpeakWord={(word) => speakText(word, true)}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between font-bold">
+                <span>💡 Tap highlighted yellow words to see pictures & definitions!</span>
+              </div>
+            </div>
+
+            {/* Question Panel */}
+            <div className="lg:col-span-6 bg-white/95 backdrop-blur-md rounded-3xl p-6 shadow-xl border-4 border-sky-100 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-extrabold text-xs uppercase tracking-wider text-sky-700 bg-sky-100 px-3 py-1 rounded-full border border-sky-200">
+                    Question {currentQuestionIdx + 1}
+                  </span>
+                  <button
+                    onClick={() => {
+                      if (currentQuestion) {
+                        speakText(currentQuestion.prompt);
+                      }
+                    }}
+                    className="text-xs font-bold text-sky-800 hover:text-sky-950 flex items-center gap-1 bg-sky-100 px-2.5 py-1 rounded-lg border border-sky-200 cursor-pointer"
+                  >
+                    <Volume2 className="w-3.5 h-3.5 text-sky-600" /> Read Question
+                  </button>
+                </div>
+
+                {currentQuestion?.subtitle && (
+                  <p className="text-xs font-extrabold text-slate-500 uppercase tracking-wide mb-1">
+                    {currentQuestion.subtitle}
+                  </p>
+                )}
+
+                <h3 className="text-2xl font-black text-slate-900 mb-4 leading-tight">
+                  {currentQuestion?.prompt}
+                </h3>
+
+                {/* Render Question Cards based on Type */}
+                {currentQuestion?.type === 'multiple_choice_image' && (
+                  <ImageMultipleChoiceQuestion
+                    question={currentQuestion}
+                    selectedOption={userAnswers[currentQuestion.id]}
+                    onSelect={(optId) => setUserAnswers(prev => ({ ...prev, [currentQuestion.id]: optId }))}
+                  />
+                )}
+
+                {currentQuestion?.type === 'true_false' && (
+                  <TrueFalseQuestion
+                    selectedValue={userAnswers[currentQuestion.id]}
+                    onSelect={(val) => setUserAnswers(prev => ({ ...prev, [currentQuestion.id]: val }))}
+                  />
+                )}
+
+                {currentQuestion?.type === 'matching' && (
+                  <MatchingQuestion
+                    pairs={currentQuestion.pairs}
+                    matches={matchingPairs[currentQuestion.id] || {}}
+                    onMatchPair={(wordId, targetId) => {
+                      setMatchingPairs(prev => ({
+                        ...prev,
+                        [currentQuestion.id]: {
+                          ...(prev[currentQuestion.id] || {}),
+                          [wordId]: targetId
+                        }
+                      }));
+                    }}
+                  />
+                )}
+
+                {currentQuestion?.type === 'sequence' && (
+                  <SequenceOrderingQuestion
+                    currentOrder={sequenceOrders[currentQuestion.id] || currentQuestion.items}
+                    onMoveUp={handleMoveSequenceUp}
+                    onMoveDown={handleMoveSequenceDown}
+                  />
+                )}
+
+                {(currentQuestion?.type === 'multiple_choice_text' || currentQuestion?.type === 'context_vocabulary') && (
+                  <TextMultipleChoiceQuestion
+                    question={currentQuestion}
+                    selectedOption={userAnswers[currentQuestion.id]}
+                    onSelect={(optId) => setUserAnswers(prev => ({ ...prev, [currentQuestion.id]: optId }))}
+                  />
+                )}
+              </div>
+
+              {/* Feedback & Navigation Actions */}
+              <div className="mt-6 pt-4 border-t border-slate-200">
+                {feedback && (
+                  <div className={`p-4 rounded-2xl mb-4 font-black text-lg flex items-center gap-3 animate-in fade-in duration-200 ${
+                    feedback.isCorrect 
+                      ? 'bg-emerald-100 text-emerald-950 border-2 border-emerald-400' 
+                      : 'bg-amber-100 text-amber-950 border-2 border-amber-400'
+                  }`}>
+                    {feedback.isCorrect ? (
+                      <CheckCircle2 className="w-8 h-8 text-emerald-600 shrink-0" />
+                    ) : (
+                      <HelpCircle className="w-8 h-8 text-amber-600 shrink-0" />
+                    )}
+                    <span>{feedback.message}</span>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-3">
+                  <button
+                    onClick={() => {
+                      if (currentQuestionIdx > 0) {
+                        setCurrentQuestionIdx(prev => prev - 1);
+                        setFeedback(null);
+                      }
+                    }}
+                    disabled={currentQuestionIdx === 0}
+                    className="px-4 py-3 rounded-xl font-black bg-slate-100 hover:bg-slate-200 disabled:opacity-40 text-slate-700 transition-all cursor-pointer"
+                  >
+                    Back
+                  </button>
+
+                  {!feedback?.isCorrect ? (
+                    <button
+                      onClick={handleCheckAnswer}
+                      className="flex-1 py-4 px-6 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-amber-950 font-black text-xl shadow-lg hover:shadow-xl transition-all cursor-pointer border-b-4 border-amber-600 flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle2 className="w-6 h-6" /> Check Answer
                     </button>
-                </td>
-            </tr>
-        `).join('');
-    }
+                  ) : (
+                    <button
+                      onClick={handleNextQuestion}
+                      className="flex-1 py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black text-xl shadow-lg hover:shadow-xl transition-all cursor-pointer border-b-4 border-emerald-700 flex items-center justify-center gap-2"
+                    >
+                      <span>{currentQuestionIdx + 1 < totalQuestions ? 'Next Question' : 'See Results'}</span>
+                      <ArrowRight className="w-6 h-6" />
+                    </button>
+                  )}
+                </div>
+              </div>
 
-    function filterVerbList() {
-        const query = document.getElementById('verb-search-input').value.toLowerCase();
-        const typeFilter = document.getElementById('verb-type-filter').value;
+            </div>
 
-        const filtered = VERB_LIST.filter(v => {
-            const matchesQuery = v.pres.toLowerCase().includes(query) || 
-                                 v.past.toLowerCase().includes(query) || 
-                                 v.spanish.toLowerCase().includes(query);
-            const matchesType = (typeFilter === 'all') || (v.type === typeFilter);
-            return matchesQuery && matchesType;
-        });
+          </div>
 
-        populateVerbTable(filtered);
-    }
+        </main>
+      )}
 
-    /* Unit Event Listeners fallback */
-    function attachUnitEventListeners() {}
+      {/* SCREEN 3: RESULTS */}
+      {currentScreen === 'results' && (
+        <main className="relative z-10 max-w-3xl mx-auto px-4 py-8 flex-1 flex flex-col justify-center items-center text-center">
+          <div className="bg-white/95 backdrop-blur-lg rounded-3xl p-6 sm:p-10 shadow-2xl border-4 border-amber-300 w-full animate-in zoom-in duration-300">
+            
+            <div className="text-6xl mb-2 animate-bounce">🏆</div>
 
-    /* Preferences Event Listeners */
-    function attachPreferencesEventListeners() {}
+            {/* Student Name & Level Banner */}
+            <div className="bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-2xl p-4 mb-6 shadow-md border-2 border-white/40">
+              <span className="text-xs font-black uppercase tracking-widest text-sky-200 block mb-1">
+                Reading Assessment Certificate
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-black mb-1">
+                {studentName ? studentName : 'Super Reader'}
+              </h2>
+              <p className="text-sm font-bold text-sky-100">
+                Completed: {currentLevelData.levelTitle}
+              </p>
+            </div>
 
-    function saveAndApplyPreferences() {
-        AppState.preferences.fontFamily = document.getElementById('pref-font-family').value;
-        AppState.preferences.fontSize = document.getElementById('pref-font-size').value;
-        AppState.preferences.lineSpacing = document.getElementById('pref-line-spacing').value;
-        AppState.preferences.highContrast = document.getElementById('pref-high-contrast').checked;
-        AppState.preferences.focusMode = document.getElementById('pref-focus-mode').checked;
-        AppState.preferences.speechRate = parseFloat(document.getElementById('pref-speech-rate').value);
+            {/* Star Rating Display */}
+            <div className="flex justify-center gap-3 mb-6">
+              {[1, 2, 3].map((starIndex) => {
+                const isEarned = (percentage >= 33 && starIndex === 1) ||
+                                 (percentage >= 66 && starIndex === 2) ||
+                                 (percentage >= 100 && starIndex === 3);
+                return (
+                  <div 
+                    key={starIndex}
+                    className={`p-3 rounded-full border-4 transition-transform ${
+                      isEarned 
+                        ? 'bg-amber-100 border-amber-400 text-amber-500 scale-110 shadow-lg animate-pulse' 
+                        : 'bg-slate-100 border-slate-300 text-slate-300'
+                    }`}
+                  >
+                    <Star className="w-10 h-10 sm:w-12 sm:h-12 fill-current" />
+                  </div>
+                );
+              })}
+            </div>
 
-        updatePreferencesUI();
-        alert("Preferences saved and applied successfully!");
-    }
+            {/* Score Box */}
+            <div className="bg-sky-50 border-3 border-sky-200 rounded-2xl p-5 mb-6 max-w-md mx-auto shadow-inner">
+              <div className="text-xs font-black text-sky-800 uppercase tracking-wider mb-1">
+                Final Score
+              </div>
+              <div className="text-5xl font-black text-sky-950 mb-1">
+                {score} / {totalQuestions}
+              </div>
+              <div className="text-lg font-black text-amber-600 mb-2">
+                {percentage}% Correct
+              </div>
+              <p className="text-sm font-extrabold text-slate-700">
+                {percentage === 100 
+                  ? '🌟 Perfect Score! Excellent reading comprehension!' 
+                  : percentage >= 60 
+                  ? '🎉 Great job! You understand the main ideas well!' 
+                  : '🌊 Good effort! Try again to get all 3 stars!'}
+              </p>
+            </div>
 
-    function resetAllProgress() {
-        if (confirm("Are you sure you want to reset all quiz progress and student writing notes?")) {
-            AppState.progress = {};
-            AppState.studentNotes = {};
-            localStorage.removeItem('readbridge_progress');
-            localStorage.removeItem('readbridge_notes');
-            renderApp();
-        }
-    }
+            {/* Badges Unlocked */}
+            <div className="mb-6">
+              <h3 className="font-extrabold text-slate-700 text-xs uppercase tracking-wider mb-3">
+                Badges Earned:
+              </h3>
+              <div className="flex flex-wrap justify-center gap-3">
+                <div className="bg-amber-100 border-2 border-amber-300 px-4 py-2 rounded-2xl flex items-center gap-2 text-amber-950 font-bold shadow-xs">
+                  <Award className="w-5 h-5 text-amber-600" /> Ocean Explorer
+                </div>
+                {selectedLevelId === 'A1' && (
+                  <div className="bg-cyan-100 border-2 border-cyan-300 px-4 py-2 rounded-2xl flex items-center gap-2 text-cyan-950 font-bold shadow-xs">
+                    🐬 Word Star (A1)
+                  </div>
+                )}
+                {selectedLevelId === 'A2' && (
+                  <div className="bg-emerald-100 border-2 border-emerald-300 px-4 py-2 rounded-2xl flex items-center gap-2 text-emerald-950 font-bold shadow-xs">
+                    🐢 Sentence Master (A2)
+                  </div>
+                )}
+              </div>
+            </div>
 
-    function generateTeacherReport() {
-        const modal = document.getElementById('teacher-report-modal');
-        const content = document.getElementById('teacher-report-content');
-        if (!modal || !content) return;
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={() => handleStartAssessment(selectedLevelId)}
+                className="py-3.5 px-6 rounded-2xl bg-sky-500 hover:bg-sky-600 text-white font-black text-lg shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <RotateCcw className="w-5 h-5" /> Try Level Again
+              </button>
 
-        let reportText = `=================================================\n`;
-        reportText += `   READBRIDGE STUDENT PROGRESS REPORT\n`;
-        reportText += `   Date: ${new Date().toLocaleDateString()}\n`;
-        reportText += `=================================================\n\n`;
+              <button
+                onClick={() => {
+                  playSoundEffect('pop');
+                  setCurrentScreen('welcome');
+                }}
+                className="py-3.5 px-6 rounded-2xl bg-amber-400 hover:bg-amber-500 text-amber-950 font-black text-lg shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Compass className="w-5 h-5" /> Choose Level
+              </button>
+            </div>
 
-        Object.values(UNIT_DATA).forEach(u => {
-            const p = AppState.progress[u.id] || {};
-            const n = AppState.studentNotes[u.id] || '(No written notes entered yet)';
-            reportText += `UNIT ${u.id}: ${u.title} (${u.tense})\n`;
-            reportText += `-------------------------------------------------\n`;
-            reportText += `Comprehension Quiz Score: ${p.quizScore || 0}%\n`;
-            reportText += `Unit Completion Status:  ${p.completed ? 'COMPLETED' : 'INCOMPLETE'}\n`;
-            reportText += `Student Writing Notes:\n"${n}"\n\n`;
-        });
+          </div>
+        </main>
+      )}
 
-        content.innerText = reportText;
-        modal.classList.remove('hidden');
-    }
-</script>
-</body>
-</html>
+      <footer className="relative z-10 text-center py-3 text-sky-100 text-xs font-medium">
+        Ocean Reading Quest • CEFR Reading Assessment for 10-Year-Old Learners
+      </footer>
+
+    </div>
+  );
+}
